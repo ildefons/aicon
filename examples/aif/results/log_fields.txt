@@ -1,0 +1,43 @@
+id: id of the log entry
+type: COMP_M or SINL_M
+app: application name
+module: module receiving the message
+message: message name
+DES.src: id of the module instance sending the message
+DES.dst: if of the module instance receiving the message
+TOPO.src: id of the topology node sending the message
+TOPO.dst: id of the topology node receiving the message
+module.src: source module name 
+service: duration of of service (units of time, It can be parts of time units)
+
+time_in: time message started being processed by module
+time_out: time message ended being processed by module
+time_emit: time message started to travel the input communication link (opinion from stat code) 
+time_reception: time message enters in module instance queue (same as time_in if queue empty)
+
+example:
+44,COMP_M,SimpleCase,ServiceA,M.A,0,2,1,0,Camera,0.004,
+4410.001,
+4410.005,
+4400.0,
+4410.001
+
+44,SINK_M,SimpleCase,Dashboard,M.B,2,1,0,2,ServiceA,0,
+4411.0055,
+4411.0055,
+4410.005,
+4411.0055
+
+43,SINK_M,SimpleCase,Dashboard,M.B,2,1,0,2,ServiceA,0,4311.0055,4311.0055,4310.005,4311.0055
+44,COMP_M,SimpleCase,ServiceA,M.A,0,2,1,0,Camera,0.004,4410.001,4410.005,4400.0,4410.001
+
+The "stats" module explains these 4 time fields:
+
+def compute_times_df(self):
+    self.df["time_latency"] = self.df["time_reception"] - self.df["time_emit"] # 
+    self.df["time_wait"] = self.df["time_in"] - self.df["time_reception"]  #Time wait in module instance queue?
+    self.df["time_service"] = self.df["time_out"] - self.df["time_in"]
+    self.df["time_response"] = self.df["time_out"] - self.df["time_reception"]
+    self.df["time_total_response"] = self.df["time_response"] + self.df["time_latency"]
+
+
