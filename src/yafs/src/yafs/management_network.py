@@ -255,19 +255,34 @@ class ManagementAgent:
         while not self.stop and self.sim.des_process_running[self.DES_id]:
             #Simulated wake up/oeration cycle
             self.logger.info(f"Agent {self.node_id} waking at {self.sim.env.now}, colocated on node {self.node_id}")
-            time_agent_starts_sleeping = self.sim.env.now
+            time_sleep_start = self.sim.env.now
             yield self.sim.env.timeout(self.wake_up_interval)  # Sleep
-            time_starts_acting = self.sim.env.now
+            time_sleep_end = self.sim.env.now
             self.logger.info(f"Agent {self.node_id} executing on node {self.node_id}")
-            yield self.sim.env.timeout(self.instructions_per_wakeup) # Work 
-            time_ends_acting = self.sim.env.now
-            
-            print(self.agent_name,time_agent_starts_sleeping,time_starts_acting,time_ends_acting,"\n","---------")
 
+            #Compute time working as self.instructions_per_wakeup/float(node["IPT"])  
+            att_node = self.sim.topology.G.nodes[self.node_id]
+            time_of_service = self.instructions_per_wakeup / float(att_node["IPT"])
+
+            #Simulate agent' time of service
+            yield self.sim.env.timeout(time_of_service) # Work 
+            time_processing_end = self.sim.env.now
+            
             #Real logic of the management agent
             metrics = self.collect_metrics()
             actions = self.get_management_actions(metrics)   # main method to be customized
             self.apply_actions(actions)
+
+            #Update agent metrics
+            self.sim.metrics.insert_agent_step({
+                         "type": self.sim.AGENT_METRIC,
+                         "node_id": self.node_id,
+                         "DES_id": self.DES_id, 
+                         "agent_name": self.agent_name,
+                         "time_sleep_start": time_sleep_start,
+                         "time_sleep_end": time_sleep_end,
+                         "time_processing_end": time_processing_end
+                         })
         
         self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
         

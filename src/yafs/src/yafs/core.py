@@ -50,6 +50,8 @@ class Sim:
     FORWARD_METRIC = "FWD_M"
     SINK_METRIC = "SINK_M"
     LINK_METRIC = "LINK"
+    #ILDE: next is a metric type for management agent steps
+    AGENT_METRIC = "AGENT_M"
 
     def __init__(self, topology, name_register='events_log.json', link_register='links_log.json', redis=None, purge_register=True, logger=None, default_results_path=None):
 

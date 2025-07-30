@@ -9,6 +9,8 @@ class Stats:
     def __init__(self,defaultPath="result"):
         self.df_link = pd.read_csv(defaultPath + "_link.csv")
         self.df = pd.read_csv(defaultPath + ".csv")
+        #ILDE
+        self.df_agent = pd.read_csv(defaultPath + "_agent.csv")
 
 
     def bytes_transmitted(self):
