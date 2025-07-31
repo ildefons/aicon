@@ -309,9 +309,9 @@ def main(simulated_time):
 
     # declaration of my management network
     agent_configs = [
-        (0, CloudAgent, 10, 100),  # Cloud agent
-        (1, SensorAgent, 10, 100),  # Sensor agent
-        (2, ActuatorAgent, 10, 100)  # Actuator agent
+        (0, CloudAgent, 10, 25*10*10**8),  # Cloud agent     (Node_id, agent_class_name, wake_up_interval, instructions_per_wakeup)
+        (1, SensorAgent, 10, 5*10**8),  # Sensor agent
+        (2, ActuatorAgent, 10, 50*10*10**6)  # Actuator agent
     ]
     management_network = ManagementAgentNetwork("management_network", agent_configs, sim)
     # Set matrix N for your 3-node case
@@ -327,6 +327,36 @@ def main(simulated_time):
     """
     sim.run(stop_time, show_progress_monitor=False)  # To test deployments put test_initial_deploy a TRUE
     sim.print_debug_assignaments()
+
+    time_loops = [["M.A", "M.B"]]
+
+    from yafs.stats import Stats
+    mypath = "/home/ildefons/yaf310/examples/aif/results/sim_trace"
+
+    m = Stats(defaultPath=mypath)
+    m.showResults2(simulated_time, time_loops=time_loops)
+    
+    print("\t- Network saturation -")
+    print("\t\tAverage waiting messages : %i" % m.average_messages_not_transmitted())
+    print("\t\tPeak of waiting messages : %i" % m.peak_messages_not_transmitted())
+    print("\t\tTOTAL messages not transmitted: %i" % m.messages_not_transmitted())
+
+    print("\n\t- Stats of each service deployed -")
+    print(m.get_df_modules())
+    print(m.get_df_service_utilization("ServiceA",simulated_time))
+
+    print("\n\t- Stats of each DEVICE -")
+
+    print("\n\t- Stats of each management agent deployed -")
+    print(m.get_df_agent_modules())
+
+    for i in sim.management_network['management_network']['management_network'].agents.keys():
+        agent_name = sim.management_network['management_network']['management_network'].agents[i].agent_name
+        print("---------------------\n",agent_name)
+        print(m.get_df_agent_utilization(agent_name,simulated_time))
+        print(m.get_df_agent_sleeping_percentage(agent_name,simulated_time))
+        
+    #print(m.get_df_service_utilization("ServiceA",simulated_time))
 
     # s.draw_allocated_topology() # for debugging
 

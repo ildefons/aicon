@@ -180,5 +180,40 @@ class Stats:
         h["module"] = g[g.module == service].module
         h["utilization"] = g[g.module == service]["service"]["sum"]*100 / time
         return h
+    
+    #ILDE: statistics extracted from df_agent frame
+    # {"type",
+    # "node_id",
+    # "DES_id", 
+    # "agent_name",
+    # "time_sleep_start",
+    # "time_sleep_end",
+    # "time_processing_end",
+    # "service"}    
+    def get_df_agent_modules(self):
+        g = self.df_agent.groupby(["agent_name", "node_id", "DES_id"]).agg({"service": ['mean', 'sum', 'count']})
+        return g.reset_index()
 
+    def get_df_agent_utilization(self,agent_name,time):
+        """
+        Returns the utilization(%) of a specific management agent
+        """
+        #g = self.df.groupby(["module", "DES.dst"]).agg({"service": ['mean', 'sum', 'count']})
+        g = self.df_agent.groupby(["agent_name", "node_id", "DES_id"]).agg({"service": ['mean', 'sum', 'count']})
+        g.reset_index(inplace=True)
+        h = pd.DataFrame()
+        h["agent_name"] = g[g.agent_name == agent_name].agent_name
+        h["utilization"] = g[g.agent_name == agent_name]["service"]["sum"]*100 / time
+        return h
 
+    def get_df_agent_sleeping_percentage(self,agent_name,time):
+        """
+        Returns the sleeping time(%) of a specific management agent
+        """
+        #g = self.df.groupby(["module", "DES.dst"]).agg({"service": ['mean', 'sum', 'count']})
+        g = self.df_agent.groupby(["agent_name", "node_id", "DES_id"]).agg({"sleeping_time": ['mean', 'sum', 'count']})
+        g.reset_index(inplace=True)
+        h = pd.DataFrame()
+        h["agent_name"] = g[g.agent_name == agent_name].agent_name
+        h["sleeping_percentage"] = g[g.agent_name == agent_name]["sleeping_time"]["sum"]*100 / time
+        return h

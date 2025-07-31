@@ -17,7 +17,7 @@ class Metrics:
                          "time_emit","time_reception"]
         columns_link = ["id","type", "src", "dst", "app", "latency", "message", "ctime", "size","buffer"]
         #ILDE: columns of agent trace CSV file
-        columns_agent = ["type", "node_id","DES_id","agent_name","time_sleep_start","time_sleep_end","time_processing_end"]
+        columns_agent = ["type", "node_id","DES_id","agent_name","time_sleep_start","time_sleep_end","sleeping_time","time_processing_end", "service"]
 
         path = "result"
         if  default_results_path is not None:
@@ -84,7 +84,9 @@ class Metrics:
                     value["agent_name"],
                     value["time_sleep_start"],
                     value["time_sleep_end"],
-                    value["time_processing_end"]
+                    value["sleeping_time"],
+                    value["time_processing_end"],
+                    value["service"]
                             ])
 
 

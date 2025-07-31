@@ -281,9 +281,17 @@ class ManagementAgent:
                          "agent_name": self.agent_name,
                          "time_sleep_start": time_sleep_start,
                          "time_sleep_end": time_sleep_end,
-                         "time_processing_end": time_processing_end
+                         "sleeping_time": float(time_sleep_end-time_sleep_start),
+                         "time_processing_end": time_processing_end,
+                         "service": float(time_processing_end-time_sleep_end)
                          })
-        
+            # print("------------------------")
+            # print("agent_name:", self.agent_name)
+            # print("time sleeping:",self.wake_up_interval)
+            # print("time sleeping (with now):",float(time_sleep_end-time_sleep_start))
+            # print("time_of_service:",time_of_service)
+            # print("time_of_service (with now):",time_processing_end-time_sleep_end)
+
         self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
         
 

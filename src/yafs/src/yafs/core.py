@@ -1005,8 +1005,8 @@ class Sim:
         # Add Selection control to the App
         self.selector_path[app.name] = selector
 
-        # ILDE: add population of management agents  <------THIS LOOP IS OT DOING MUCH BY THE TIME BEING
-        if not management_network.name in self.management_network.keys(): #First time <----IMHERE
+        # ILDE: management network to the app (useful to access information about the agents: name, wake period, processing instructions, and so on)
+        if not management_network.name in self.management_network.keys(): 
             self.management_network[management_network.name] = {"management_network": management_network, "apps": []}
             if management_network.activation_dist is not None:  
                 self.env.process(self.__add_management_network_process(management_network))
