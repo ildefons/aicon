@@ -232,7 +232,7 @@ import numpy as np
 import logging
 
 class ManagementAgent:
-    def __init__(self, sim, node_id, DES_id, agent_name, N, wake_up_interval, instructions_per_wakeup):
+    def __init__(self, sim, node_id, DES_id, agent_name, N, wake_up_interval, instructions_per_wakeup, agent_ipt_percentage):
         self.sim = sim
         self.node_id = node_id  # Node where agent is colocated
         self.DES_id = DES_id # Id of the DES process for this agent 
@@ -243,6 +243,7 @@ class ManagementAgent:
         self.message_queue = simpy.Store(self.sim.env)
         self.logger = sim.logger
         self.stop = False
+        self.agent_ipt_percentage = agent_ipt_percentage # this percentage is used when updating node metrics to compute the used instructions by both the agent and the module running in the same node_id
         #self.sim.env.process(self.run())
 
     def run(self):
@@ -262,7 +263,8 @@ class ManagementAgent:
 
             #Compute time working as self.instructions_per_wakeup/float(node["IPT"])  
             att_node = self.sim.topology.G.nodes[self.node_id]
-            time_of_service = self.instructions_per_wakeup / float(att_node["IPT"])
+            available_ipt = self.agent_ipt_percentage * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
+            time_of_service = self.instructions_per_wakeup / available_ipt  #float(att_node["IPT"])
 
             #Simulate agent' time of service
             yield self.sim.env.timeout(time_of_service) # Work 
@@ -278,7 +280,17 @@ class ManagementAgent:
                          "type": self.sim.AGENT_METRIC,
                          "node_id": self.node_id,
                          "DES_id": self.DES_id, 
-                         "agent_name": self.agent_name,
+                         "agent_name": self.agent_name,                # print("Inside _update_node_metrics")
+                # print("id_node:", id_node)
+                # # check whether this node has a running agent
+                # agent_node_ids = [config[0] for config in self.management_network['management_network']['management_network'].agent_configs]
+                # print(agent_node_ids)
+                # position = -1
+                # try:
+                #     position = agent_node_ids.index(id_node)
+                # except ValueError:
+                #     pass
+                # print("_____",position)
                          "time_sleep_start": time_sleep_start,
                          "time_sleep_end": time_sleep_end,
                          "sleeping_time": float(time_sleep_end-time_sleep_start),
@@ -377,11 +389,15 @@ class ManagementAgentNetwork:
         .. attention:: override required
         """
 
-        for node_id, agent_type, param1, param2 in self.agent_configs:
+        for node_id, agent_type, param1, param2, agent_ipt_percentage in self.agent_configs:
             N = [] # ILDE: TBD
             myId = self.sim._Sim__get_id_process()#__get_id_process() is private so I overcome the privatenss explicitly (not nice)
             agent_name = "agent_" + "node" + str(node_id) + "_" + agent_type.__name__
-            agent = agent_type(self.sim, node_id, myId, agent_name, N, param1, param2)
+
+            #make sure agent_ipt_percentage is within range [0,1]. If not floor it between [0,1] + log a warning
+            agent_ipt_percentage_01 = max(0, min(1, agent_ipt_percentage))
+
+            agent = agent_type(self.sim, node_id, myId, agent_name, N, param1, param2, agent_ipt_percentage_01)
             self.agents[node_id] = agent
             # start gant process        
 

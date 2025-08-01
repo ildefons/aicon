@@ -309,9 +309,9 @@ def main(simulated_time):
 
     # declaration of my management network
     agent_configs = [
-        (0, CloudAgent, 10, 25*10*10**8),  # Cloud agent     (Node_id, agent_class_name, wake_up_interval, instructions_per_wakeup)
-        (1, SensorAgent, 10, 5*10**8),  # Sensor agent
-        (2, ActuatorAgent, 10, 50*10*10**6)  # Actuator agent
+        (0, CloudAgent, 10, 5*10*10**8, 0.5),  # Cloud agent     (Node_id, agent_class_name, wake_up_interval, instructions_per_wakeup, node_ipt_percentage)
+        (1, SensorAgent, 10, 10**8, 0.5),  # Sensor agent
+        (2, ActuatorAgent, 10, 10*10*10**6, 0.5)  # Actuator agent
     ]
     management_network = ManagementAgentNetwork("management_network", agent_configs, sim)
     # Set matrix N for your 3-node case
@@ -344,6 +344,8 @@ def main(simulated_time):
     print("\n\t- Stats of each service deployed -")
     print(m.get_df_modules())
     print(m.get_df_service_utilization("ServiceA",simulated_time))
+    print(m.get_df_service_utilization("Camera",simulated_time))
+    print(m.get_df_service_utilization("Dashboard",simulated_time))
 
     print("\n\t- Stats of each DEVICE -")
 

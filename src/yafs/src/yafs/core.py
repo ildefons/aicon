@@ -422,7 +422,31 @@ class Sim:
                 # att_node = self.topology.get_nodes_att()[id_node] # WARNING DEPRECATED from V1.0
                 att_node = self.topology.G.nodes[id_node]
 
-                time_service = message.inst / float(att_node["IPT"])
+                #ILDE
+                agent_node_ids = [config[0] for config in self.management_network['management_network']['management_network'].agent_configs]
+                available_ipt = float(att_node["IPT"])
+                position = -1
+                try:
+                    position = agent_node_ids.index(id_node)
+                except ValueError:
+                    pass
+                if position != -1:
+                    my_agent = (self.management_network['management_network']['management_network'].agents[position])
+                    available_ipt = (1-my_agent.agent_ipt_percentage) * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
+                time_service = message.inst / available_ipt
+
+                # ILDE
+                # print("Inside _update_node_metrics")
+                # print("id_node:", id_node)
+                # # check whether this node has a running agent
+                # agent_node_ids = [config[0] for config in self.management_network['management_network']['management_network'].agent_configs]
+                # print(agent_node_ids)
+                # position = -1
+                # try:
+                #     position = agent_node_ids.index(id_node)
+                # except ValueError:
+                #     pass
+                # print("_____",position)
 
 
             """
