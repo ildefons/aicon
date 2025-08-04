@@ -232,13 +232,13 @@ import numpy as np
 import logging
 
 class ManagementAgent:
-    def __init__(self, sim, node_id, DES_id, agent_name, N, wake_up_interval, instructions_per_wakeup, agent_ipt_percentage):
+    def __init__(self, sim, node_id, DES_id, agent_name, N, sleep_time, instructions_per_wakeup, agent_ipt_percentage):
         self.sim = sim
         self.node_id = node_id  # Node where agent is colocated
         self.DES_id = DES_id # Id of the DES process for this agent 
         self.agent_name = agent_name # agent name: agent_name = "agent_" + "node" + str(node_id) + "_" + agent_type.__name__
         self.N = N
-        self.wake_up_interval = wake_up_interval
+        self.sleep_time = sleep_time
         self.instructions_per_wakeup = instructions_per_wakeup
         self.message_queue = simpy.Store(self.sim.env)
         self.logger = sim.logger
@@ -257,7 +257,7 @@ class ManagementAgent:
             #Simulated wake up/oeration cycle
             self.logger.info(f"Agent {self.node_id} waking at {self.sim.env.now}, colocated on node {self.node_id}")
             time_sleep_start = self.sim.env.now
-            yield self.sim.env.timeout(self.wake_up_interval)  # Sleep
+            yield self.sim.env.timeout(self.sleep_time)  # Sleep
             time_sleep_end = self.sim.env.now
             self.logger.info(f"Agent {self.node_id} executing on node {self.node_id}")
 
@@ -360,10 +360,10 @@ class ManagementAgent:
 
 class ManagementAgentNetwork:
     
-    def __init__(self, name, agent_configs, sim, activation_dist = None,logger=None):
+    def __init__(self, name, agent_configs_json, sim, activation_dist = None,logger=None):
         self.logger = logger or logging.getLogger(__name__)
         self.name = name
-        self.agent_configs =  agent_configs
+        self.agent_configs_json =  agent_configs_json
         self.sim = sim
         self.activation_dist = activation_dist
         self.agents = {}
@@ -389,7 +389,12 @@ class ManagementAgentNetwork:
         .. attention:: override required
         """
 
-        for node_id, agent_type, param1, param2, agent_ipt_percentage in self.agent_configs:
+        for agent_json in self.agent_configs_json:
+            node_id = agent_json["node_id"]
+            agent_type = agent_json["agent_type"]
+            sleep_time = agent_json["sleep_time"]
+            instructions_per_wakeup = agent_json["instructions_per_wakeup"]
+            agent_ipt_percentage = agent_json["agent_ipt_percentage"]
             N = [] # ILDE: TBD
             myId = self.sim._Sim__get_id_process()#__get_id_process() is private so I overcome the privatenss explicitly (not nice)
             agent_name = "agent_" + "node" + str(node_id) + "_" + agent_type.__name__
@@ -397,7 +402,7 @@ class ManagementAgentNetwork:
             #make sure agent_ipt_percentage is within range [0,1]. If not floor it between [0,1] + log a warning
             agent_ipt_percentage_01 = max(0, min(1, agent_ipt_percentage))
 
-            agent = agent_type(self.sim, node_id, myId, agent_name, N, param1, param2, agent_ipt_percentage_01)
+            agent = agent_type(self.sim, node_id, myId, agent_name, N, sleep_time, instructions_per_wakeup, agent_ipt_percentage_01)
             self.agents[node_id] = agent
             # start gant process        
 

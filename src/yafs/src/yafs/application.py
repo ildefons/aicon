@@ -114,6 +114,7 @@ class Application:
         self.modules = []
         self.modules_src = []
         self.modules_sink = []
+        self.modules_sink_ilde = [] # the previous "modules_sink" only store the last sing to be declared. Here we keep all of them
         self.data = {}
 
     def __str__(self):
@@ -147,6 +148,11 @@ class Application:
                 self.modules_src.append(name)
             elif type == self.TYPE_SINK:
                 self.modules_sink = name
+            
+            #ILDE
+            if type == self.TYPE_SINK:
+                self.modules_sink_ilde.append(name)
+            
 
             self.modules.append(name)
 
@@ -159,7 +165,7 @@ class Application:
     #
     #     Args:
     #         modules (list): a list of modules names
-    #         type_module (str): TYPE_SOURCE or TYPE_SINK
+    #         type_module (str): TYPE_Smodules_sinkOURCE or TYPE_SINK
     #     """
     #     if type_module == self.TYPE_SOURCE:
     #         self.modules_src = modules
@@ -174,6 +180,13 @@ class Application:
             a list of pure source and sink modules
         """
         return [s for s in self.modules if s not in self.modules_src and s not in self.modules_sink]
+    
+    def get_pure_modules_ilde(self):
+        """
+        Returns:
+            a list of pure source and sink modules
+        """
+        return [s for s in self.modules if s not in self.modules_src and s not in self.modules_sink_ilde]
 
     def get_sink_modules(self):
         """
@@ -181,6 +194,13 @@ class Application:
             a list of sink modules
         """
         return self.modules_sink
+    
+    def get_sink_modules_ilde(self):
+        """
+        Returns:
+            a list of sink modules (ILDE: all of them)
+        """
+        return self.modules_sink_ilde
 
     def add_source_messages(self, msg):
         """

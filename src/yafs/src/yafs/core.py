@@ -412,7 +412,23 @@ class Sim:
                 The module is a SINK (Actuactor)
                 """
                 id_node  = self.alloc_DES[des]
+           
                 time_service = 0
+                
+                #ILDE
+                att_node = self.topology.G.nodes[id_node]
+                agent_node_ids = [agent["node_id"] for agent in self.management_network['management_network']['management_network'].agent_configs_json]
+                available_ipt = float(att_node["IPT"])
+                position = -1
+                try:
+                    position = agent_node_ids.index(id_node)
+                except ValueError:
+                    pass
+                if position != -1:
+                    my_agent_json = (self.management_network['management_network']['management_network'].agent_configs_json[position])
+                    available_ipt = (1-my_agent_json["agent_ipt_percentage"]) * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
+                time_service = message.inst / available_ipt
+
             else:
                 """
                 The module is a processing module
@@ -423,7 +439,7 @@ class Sim:
                 att_node = self.topology.G.nodes[id_node]
 
                 #ILDE
-                agent_node_ids = [config[0] for config in self.management_network['management_network']['management_network'].agent_configs]
+                agent_node_ids = [agent_json["node_id"] for agent_json in self.management_network['management_network']['management_network'].agent_configs_json]
                 available_ipt = float(att_node["IPT"])
                 position = -1
                 try:
@@ -431,8 +447,8 @@ class Sim:
                 except ValueError:
                     pass
                 if position != -1:
-                    my_agent = (self.management_network['management_network']['management_network'].agents[position])
-                    available_ipt = (1-my_agent.agent_ipt_percentage) * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
+                    my_agents_json = (self.management_network['management_network']['management_network'].agent_configs_json[position])
+                    available_ipt = (1-my_agents_json["agent_ipt_percentage"]) * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
                 time_service = message.inst / available_ipt
 
                 # ILDE

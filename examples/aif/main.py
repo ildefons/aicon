@@ -182,7 +182,8 @@ def create_application():
     # (Camera) --> (ServiceA) --> (dashboard)
     a.set_modules([{"Camera":{"Type":Application.TYPE_SOURCE}},
                    {"ServiceA": {"RAM": 10, "Type": Application.TYPE_MODULE}},
-                   {"Dashboard": {"Type": Application.TYPE_SINK}}
+                   {"Dashboard": {"Type": Application.TYPE_SINK}},
+                   #{"Dashboard2": {"Type": Application.TYPE_SINK}},
                    ])
     """
     Messages among MODULES (AppEdge in iFogSim)
@@ -218,7 +219,7 @@ def create_json_topology():
 
     cloud_dev    = {"id": 0, "model": "cloud","mytag":"cloud", "IPT": 5000 * 10 ** 6, "RAM": 40000,"COST": 3,"WATT":20.0}
     sensor_dev   = {"id": 1, "model": "sensor-device", "IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
-    actuator_dev = {"id": 2, "model": "actuator-device", "IPT": 100 * 10 ** 6, "RAM": 4000,"COST": 3, "WATT": 40.0}
+    actuator_dev = {"id": 2, "model": "actuator-device", "IPT": 100 * 10 ** 7, "RAM": 4000,"COST": 3, "WATT": 40.0}
 
     link1 = {"s": 0, "d": 1, "BW": 1, "PR": 10}
     link2 = {"s": 0, "d": 2, "BW": 1, "PR": 1}
@@ -307,13 +308,37 @@ def main(simulated_time):
     #sim.deploy_app2(app, placement, pop, selectorPath)
    
 
-    # declaration of my management network
-    agent_configs = [
-        (0, CloudAgent, 10, 5*10*10**8, 0.5),  # Cloud agent     (Node_id, agent_class_name, wake_up_interval, instructions_per_wakeup, node_ipt_percentage)
-        (1, SensorAgent, 10, 10**8, 0.5),  # Sensor agent
-        (2, ActuatorAgent, 10, 10*10*10**6, 0.5)  # Actuator agent
+    #ILDE: declaration of my management network
+    # agent_configs_json = [
+        #  {"node_id": 0,
+        #   "agent_type": CloudAgent,
+        #   "sleep_time": 10,  
+        #   "instructions_per_wakeup": 5*10*10**8,
+        #   "agent_ipt_percentage": 0.5  #percentage of the node CPU/GPU consumed by the agent. Needed to compute "service_time" when updating metrics 
+        #  },
+    # ]
+    agent_configs_json = [
+         {"node_id": 0,
+          "agent_type": CloudAgent,
+          "sleep_time": 10,  
+          "instructions_per_wakeup": 5*10*10**8,
+          "agent_ipt_percentage": 0.5
+         },
+         {"node_id": 1,
+          "agent_type": SensorAgent,
+          "sleep_time": 10,  
+          "instructions_per_wakeup": 10**8,
+          "agent_ipt_percentage": 0.5
+         },
+         {"node_id": 2,
+          "agent_type": ActuatorAgent,
+          "sleep_time": 10,  
+          "instructions_per_wakeup": 10*10*10**6,
+          "agent_ipt_percentage": 0.5
+         }
     ]
-    management_network = ManagementAgentNetwork("management_network", agent_configs, sim)
+
+    management_network = ManagementAgentNetwork("management_network", agent_configs_json, sim)
     # Set matrix N for your 3-node case
     # management_network.N[0][0] = (["utilization", "latency", "instructions"], [])  # Cloud: ServiceA
     # management_network.N[1][1] = (["utilization"], [])  # Sensor: Camera
@@ -349,14 +374,21 @@ def main(simulated_time):
 
     print("\n\t- Stats of each DEVICE -")
 
-    print("\n\t- Stats of each management agent deployed -")
-    print(m.get_df_agent_modules())
+    app_name = "SimpleCase"
+    app = sim.apps[app_name]
+    services = app.services
+    for service in services:
+        print(service)
 
-    for i in sim.management_network['management_network']['management_network'].agents.keys():
-        agent_name = sim.management_network['management_network']['management_network'].agents[i].agent_name
-        print("---------------------\n",agent_name)
-        print(m.get_df_agent_utilization(agent_name,simulated_time))
-        print(m.get_df_agent_sleeping_percentage(agent_name,simulated_time))
+
+    # print("\n\t- Stats of each management agent deployed -")
+    # print(m.get_df_agent_modules())
+
+    # for i in sim.management_network['management_network']['management_network'].agents.keys():
+    #     agent_name = sim.management_network['management_network']['management_network'].agents[i].agent_name
+    #     print("---------------------\n",agent_name)
+    #     print(m.get_df_agent_utilization(agent_name,simulated_time))
+    #     print(m.get_df_agent_sleeping_percentage(agent_name,simulated_time))
         
     #print(m.get_df_service_utilization("ServiceA",simulated_time))
 
