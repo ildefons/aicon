@@ -183,7 +183,7 @@ def create_application():
     a.set_modules([{"Camera":{"Type":Application.TYPE_SOURCE}},
                    {"ServiceA": {"RAM": 10, "Type": Application.TYPE_MODULE}},
                    {"Dashboard": {"Type": Application.TYPE_SINK}},
-                   #{"Dashboard2": {"Type": Application.TYPE_SINK}},
+                   {"Dashboard2": {"Type": Application.TYPE_SINK}},
                    ])
     """
     Messages among MODULES (AppEdge in iFogSim)
@@ -283,7 +283,7 @@ def main(simulated_time):
     #     module (str): identifies the module from the app who receives the messages
     pop.set_sink_control({"model": "actuator-device",
                           "number":1,
-                          "module":app.get_sink_modules()})
+                          "module": "Dashboard"}) # ILDE  app.get_sink_modules()})
 
     #In addition, a source includes a distribution function:
     dDistribution = deterministic_distribution(name="Deterministic",time=100)
