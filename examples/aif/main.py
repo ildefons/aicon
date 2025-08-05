@@ -377,12 +377,20 @@ def main(simulated_time):
     app_name = "SimpleCase"
     app = sim.apps[app_name]
     services = app.services
-    for service in services:
-        print(service)
+    
+    print("\n\t- Stats of each module deployed (except sources) -")
+    print(m.get_df_modules())
+
+    #<----- for all apps
+    # for all modules
+    # for all nodes
+    
+    # for service in services:
+    #     print(service)
 
 
-    # print("\n\t- Stats of each management agent deployed -")
-    # print(m.get_df_agent_modules())
+    print("\n\t- Stats of each management agent deployed -")
+    print(m.get_df_agent_modules())
 
     # for i in sim.management_network['management_network']['management_network'].agents.keys():
     #     agent_name = sim.management_network['management_network']['management_network'].agents[i].agent_name

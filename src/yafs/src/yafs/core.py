@@ -903,6 +903,7 @@ class Sim:
 
             module (str): module
         """
+
         idDES = self.__get_id_process()
         self.des_process_running[idDES] = True
         self.alloc_DES[idDES] = node
@@ -1019,7 +1020,9 @@ class Sim:
             population (object): :mod:`Population` class
     
             selector (object): :mod:`Selector` class
-        """
+        """   
+
+
         # Application
         self.apps[app.name] = app
     
@@ -1250,6 +1253,7 @@ class Sim:
                 management_network[1]["management_network"].initial_allocation(self, app_name)  
 
 
+
         """
         A internal DES process will stop the simulation,
         *Simpy.run.until* wait to all pipers are empty. So, hundreds of messages should be service... We force with the stop
@@ -1267,6 +1271,14 @@ class Sim:
 
         self.print_debug_assignaments()
 
+
+        #ILDE: non negotiable restriction: Only 1 module per device (+1 agent). Otherwise, utilization metrics would not be properly captured
+        #      Note: Allowing more than 1 module per device require significant redesign 
+        my_module_allocations = self.get_alloc_entities()   
+        for id, list_of_mods in my_module_allocations.items():
+            length = len(list_of_mods) if list_of_mods is not None else 0
+            if length > 1:
+                raise ValueError("Not valid deployment: more than 1 module deployed in device " + str(id) )
 
         """
         RUN
