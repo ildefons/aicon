@@ -17,6 +17,7 @@ import random
 from yafs.topology import Topology
 from yafs.application import Application
 from yafs.metrics import Metrics
+from yafs.metrics_online import Metrics_online
 from yafs.distribution import *
 
 EVENT_UP_ENTITY = "node_up"
@@ -81,7 +82,7 @@ class Sim:
 
         self.until = 0 #End time simulation
 
-        self.metrics = Metrics(default_results_path=default_results_path)
+        self.metrics = Metrics_online(default_results_path=default_results_path)
 
         self.unreachabled_links = 0
 
