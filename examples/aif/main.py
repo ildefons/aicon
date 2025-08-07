@@ -32,7 +32,7 @@ import numpy as np
 
 # Custom agent classes
 class CloudAgent(ManagementAgent):
-    def get_management_actions(self, metrics):
+    def get_management_actions(self, metrics_df):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
         print("CloudAgent.get_management_action()")
@@ -48,7 +48,7 @@ class CloudAgent(ManagementAgent):
         return actions
 
 class SensorAgent(ManagementAgent):
-    def get_management_actions(self, metrics):
+    def get_management_actions(self, metrics_df):
         """Sensor monitors metrics (no actions for now)."""
 
         print("SensorAgent.get_management_action()")
@@ -56,7 +56,7 @@ class SensorAgent(ManagementAgent):
         return []  # Extensible for future logic
 
 class ActuatorAgent(ManagementAgent):
-    def get_management_actions(self, metrics):
+    def get_management_actions(self, metrics_df):
         """Actuator monitors metrics (no actions for now)."""
 
         print("ActuatorAgent.get_management_action()")
@@ -322,19 +322,22 @@ def main(simulated_time):
           "agent_type": CloudAgent,
           "sleep_time": 10,  
           "instructions_per_wakeup": 5*10*10**8,
-          "agent_ipt_percentage": 0.5
+          "agent_ipt_percentage": 0.5,
+          "observable_node_ids": [0,1]
          },
          {"node_id": 1,
           "agent_type": SensorAgent,
           "sleep_time": 10,  
           "instructions_per_wakeup": 10**8,
-          "agent_ipt_percentage": 0.5
+          "agent_ipt_percentage": 0.5,
+          "observable_node_ids": [1,2]
          },
          {"node_id": 2,
           "agent_type": ActuatorAgent,
           "sleep_time": 10,  
           "instructions_per_wakeup": 10*10*10**6,
-          "agent_ipt_percentage": 0.5
+          "agent_ipt_percentage": 0.5,
+          "observable_node_ids": [2,0]
          }
     ]
 

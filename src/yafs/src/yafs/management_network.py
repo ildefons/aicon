@@ -6,6 +6,8 @@ import numpy as np
 
 import logging
 
+import pandas as pd
+
 # class ManagementAgent:
 #     def __init__(self, sim, node_id, N, wake_up_interval, instructions_per_wakeup):
 #         self.sim = sim
@@ -232,7 +234,16 @@ import numpy as np
 import logging
 
 class ManagementAgent:
-    def __init__(self, sim, node_id, DES_id, agent_name, N, sleep_time, instructions_per_wakeup, agent_ipt_percentage):
+    def __init__(self, 
+                 sim, 
+                 node_id, 
+                 DES_id, 
+                 agent_name, 
+                 N, 
+                 sleep_time, 
+                 instructions_per_wakeup, 
+                 agent_ipt_percentage,
+                 observable_node_ids):
         self.sim = sim
         self.node_id = node_id  # Node where agent is colocated
         self.DES_id = DES_id # Id of the DES process for this agent 
@@ -244,7 +255,10 @@ class ManagementAgent:
         self.logger = sim.logger
         self.stop = False
         self.agent_ipt_percentage = agent_ipt_percentage # this percentage is used when updating node metrics to compute the used instructions by both the agent and the module running in the same node_id
-        #self.sim.env.process(self.run())
+        self.observable_node_ids = observable_node_ids
+
+        self.last_time_agent_start_processing = -1 # we should retrieve all agent events that happened [self.last_time_agent_start_processing, end_of_sleeping]
+
 
     def run(self):
         #Registering the DES process into the simulator
@@ -261,19 +275,21 @@ class ManagementAgent:
             time_sleep_end = self.sim.env.now
             self.logger.info(f"Agent {self.node_id} executing on node {self.node_id}")
 
+            #Real logic of the management agent
+            <-----IMHERE
+            metrics_df = self.collect_metrics(self.last_time_agent_start_processing, time_sleep_end)
+            self.last_time_agent_start_processing = time_sleep_end # update for next iteration
+            actions = self.get_management_actions(metrics_df)   # main method to be customized
+            self.apply_actions(actions)
+
             #Compute time working as self.instructions_per_wakeup/float(node["IPT"])  
             att_node = self.sim.topology.G.nodes[self.node_id]
             available_ipt = self.agent_ipt_percentage * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
             time_of_service = self.instructions_per_wakeup / available_ipt  #float(att_node["IPT"])
-
+            
             #Simulate agent' time of service
             yield self.sim.env.timeout(time_of_service) # Work 
-            time_processing_end = self.sim.env.now
-            
-            #Real logic of the management agent
-            metrics = self.collect_metrics()
-            actions = self.get_management_actions(metrics)   # main method to be customized
-            self.apply_actions(actions)
+            time_processing_end = self.sim.env.now           
 
             #Update agent metrics
             self.sim.metrics.insert_agent_step({
@@ -307,11 +323,44 @@ class ManagementAgent:
         self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
         
 
-    def collect_metrics(self):
-        metrics = {
-            "node_utilization": {}, "message_latency": {}, "instructions": {},
-            "message_count": {}, "agent_execution_time": {}
-        }
+    def collect_metrics(self, time_limit):
+        # metrics = {
+        #     "node_utilization": {}, "message_latency": {}, "instructions": {},
+        #     "message_count": {}, "agent_execution_time": {}
+        # }
+        event_df = None
+        filtered_df = None
+        try:
+            event_df = self.sim.metrics.get_event_dataframe_since("app",self.last_metric_id + 1, max_rows=10**6) #read 10^6 ("all") rows since last time
+
+            app_event_df = self.sim.metrics.get_event_dataframe_where_time_out_gt(metric_type="app", 
+                                                                                 time_start_ok=self.last_time_agent_start_sleeping,
+                                                                                 time_th_ok=time_limit, 
+                                                                                 max_rows=10**6)
+            app_event_df2 = self.sim.metrics.get_event_dataframe_where_time_out_gt(metric_type="app", 
+                                                                                 time_start_ok=self.last_time_agent_start_sleeping,
+                                                                                 time_th_ok=time_limit+10000000, 
+                                                                                 max_rows=10**6)
+            print(app_event_df.shape[0],app_event_df2.shape[0])
+            #:self.sim.metrics.get_event_dataframe_since(self.last_metric_id + 1, max_rows=10*6)
+
+        except IndexError as e:
+            print("Error: Entry index is out of bounds.")
+        except Exception as e:
+            print("Unexpected error:", str(e))
+         
+        if event_df is not None:
+            event_df['TOPO.dst'] = pd.to_numeric(event_df['TOPO.dst'], errors='coerce')
+            event_df['id'] = pd.to_numeric(event_df['id'], errors='coerce')
+            self.last_metric_id = int(event_df['id'].max()) # updates the top metric id read so far 
+
+            filtered_df = event_df[event_df['TOPO.dst'].isin(self.observable_node_ids)]
+            # print("event_df.shape", event_df.shape)
+            # print("self.observable_node_ids", self.observable_node_ids)
+            # print("filtered_df[\"TOPO.dst\"]",filtered_df["TOPO.dst"])
+
+        #<---IMHERE: collect metrics since last collection
+
         # for node in range(len(self.N)):
         #     if "utilization" in self.N[self.node_id][node][0]:
         #         metrics["node_utilization"][node] = self.sim.topology.G.nodes[node].get("utilization", 0)
@@ -334,7 +383,7 @@ class ManagementAgent:
         #             entry["execution_time"] for entry in self.sim.metrics.data
         #             if entry["node"] == node and entry["message"] == "AgentExecution"
         #         )
-        return metrics
+        return filtered_df
     
     def get_management_actions(self, metrics):
         return []
@@ -395,6 +444,7 @@ class ManagementAgentNetwork:
             sleep_time = agent_json["sleep_time"]
             instructions_per_wakeup = agent_json["instructions_per_wakeup"]
             agent_ipt_percentage = agent_json["agent_ipt_percentage"]
+            observable_node_ids = agent_json["observable_node_ids"]
             N = [] # ILDE: TBD
             myId = self.sim._Sim__get_id_process()#__get_id_process() is private so I overcome the privatenss explicitly (not nice)
             agent_name = "agent_" + "node" + str(node_id) + "_" + agent_type.__name__
@@ -402,7 +452,9 @@ class ManagementAgentNetwork:
             #make sure agent_ipt_percentage is within range [0,1]. If not floor it between [0,1] + log a warning
             agent_ipt_percentage_01 = max(0, min(1, agent_ipt_percentage))
 
-            agent = agent_type(self.sim, node_id, myId, agent_name, N, sleep_time, instructions_per_wakeup, agent_ipt_percentage_01)
+            observable_node_ids = agent_json["observable_node_ids"]
+            agent = agent_type(self.sim, node_id, myId, agent_name, N, sleep_time, instructions_per_wakeup, 
+                               agent_ipt_percentage_01, observable_node_ids)
             self.agents[node_id] = agent
             # start gant process        
 
