@@ -32,7 +32,7 @@ import numpy as np
 
 # Custom agent classes
 class CloudAgent(ManagementAgent):
-    def get_management_actions(self, metrics_df):
+    def get_management_actions(self, app_metrics_df, agent_metrics_df):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
         print("CloudAgent.get_management_action()")
@@ -48,7 +48,7 @@ class CloudAgent(ManagementAgent):
         return actions
 
 class SensorAgent(ManagementAgent):
-    def get_management_actions(self, metrics_df):
+    def get_management_actions(self, app_metrics_df, agent_metrics_df):
         """Sensor monitors metrics (no actions for now)."""
 
         print("SensorAgent.get_management_action()")
@@ -56,7 +56,7 @@ class SensorAgent(ManagementAgent):
         return []  # Extensible for future logic
 
 class ActuatorAgent(ManagementAgent):
-    def get_management_actions(self, metrics_df):
+    def get_management_actions(self, app_metrics_df, agent_metrics_df):
         """Actuator monitors metrics (no actions for now)."""
 
         print("ActuatorAgent.get_management_action()")
@@ -320,21 +320,21 @@ def main(simulated_time):
     agent_configs_json = [
          {"node_id": 0,
           "agent_type": CloudAgent,
-          "sleep_time": 10,  
+          "sleep_time": 500,  
           "instructions_per_wakeup": 5*10*10**8,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [0,1]
          },
          {"node_id": 1,
           "agent_type": SensorAgent,
-          "sleep_time": 10,  
+          "sleep_time": 500,  
           "instructions_per_wakeup": 10**8,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [1,2]
          },
          {"node_id": 2,
           "agent_type": ActuatorAgent,
-          "sleep_time": 10,  
+          "sleep_time": 500,  
           "instructions_per_wakeup": 10*10*10**6,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [2,0]
@@ -383,14 +383,6 @@ def main(simulated_time):
     
     print("\n\t- Stats of each module deployed (except sources) -")
     print(m.get_df_modules())
-
-    #<----- for all apps
-    # for all modules
-    # for all nodes
-    
-    # for service in services:
-    #     print(service)
-
 
     print("\n\t- Stats of each management agent deployed -")
     print(m.get_df_agent_modules())

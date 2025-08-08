@@ -276,10 +276,9 @@ class ManagementAgent:
             self.logger.info(f"Agent {self.node_id} executing on node {self.node_id}")
 
             #Real logic of the management agent
-            <-----IMHERE
-            metrics_df = self.collect_metrics(self.last_time_agent_start_processing, time_sleep_end)
+            app_metrics_df, agent_metrics_df = self.collect_metrics()
             self.last_time_agent_start_processing = time_sleep_end # update for next iteration
-            actions = self.get_management_actions(metrics_df)   # main method to be customized
+            actions = self.get_management_actions(app_metrics_df, agent_metrics_df)   # main method to be customized
             self.apply_actions(actions)
 
             #Compute time working as self.instructions_per_wakeup/float(node["IPT"])  
@@ -296,71 +295,47 @@ class ManagementAgent:
                          "type": self.sim.AGENT_METRIC,
                          "node_id": self.node_id,
                          "DES_id": self.DES_id, 
-                         "agent_name": self.agent_name,                # print("Inside _update_node_metrics")
-                # print("id_node:", id_node)
-                # # check whether this node has a running agent
-                # agent_node_ids = [config[0] for config in self.management_network['management_network']['management_network'].agent_configs]
-                # print(agent_node_ids)
-                # position = -1
-                # try:
-                #     position = agent_node_ids.index(id_node)
-                # except ValueError:
-                #     pass
-                # print("_____",position)
+                         "agent_name": self.agent_name,               
                          "time_sleep_start": time_sleep_start,
                          "time_sleep_end": time_sleep_end,
                          "sleeping_time": float(time_sleep_end-time_sleep_start),
                          "time_processing_end": time_processing_end,
                          "service": float(time_processing_end-time_sleep_end)
                          })
-            # print("------------------------")
-            # print("agent_name:", self.agent_name)
-            # print("time sleeping:",self.wake_up_interval)
-            # print("time sleeping (with now):",float(time_sleep_end-time_sleep_start))
-            # print("time_of_service:",time_of_service)
-            # print("time_of_service (with now):",time_processing_end-time_sleep_end)
 
         self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
         
 
-    def collect_metrics(self, time_limit):
+    def collect_metrics(self):
         # metrics = {
         #     "node_utilization": {}, "message_latency": {}, "instructions": {},
         #     "message_count": {}, "agent_execution_time": {}
         # }
-        event_df = None
-        filtered_df = None
+        app_event_df = None
+        app_filtered_df = None
+        agent_filtered_df = None
         try:
-            event_df = self.sim.metrics.get_event_dataframe_since("app",self.last_metric_id + 1, max_rows=10**6) #read 10^6 ("all") rows since last time
-
             app_event_df = self.sim.metrics.get_event_dataframe_where_time_out_gt(metric_type="app", 
-                                                                                 time_start_ok=self.last_time_agent_start_sleeping,
-                                                                                 time_th_ok=time_limit, 
-                                                                                 max_rows=10**6)
-            app_event_df2 = self.sim.metrics.get_event_dataframe_where_time_out_gt(metric_type="app", 
-                                                                                 time_start_ok=self.last_time_agent_start_sleeping,
-                                                                                 time_th_ok=time_limit+10000000, 
-                                                                                 max_rows=10**6)
-            print(app_event_df.shape[0],app_event_df2.shape[0])
-            #:self.sim.metrics.get_event_dataframe_since(self.last_metric_id + 1, max_rows=10*6)
+                                                                              min_time=self.last_time_agent_start_processing,
+                                                                              max_rows=10**6)
+            agent_event_df = self.sim.metrics.get_event_dataframe_where_time_out_gt(metric_type="agent", 
+                                                                                  min_time=self.last_time_agent_start_processing,
+                                                                                  max_rows=10**6)
 
         except IndexError as e:
             print("Error: Entry index is out of bounds.")
         except Exception as e:
             print("Unexpected error:", str(e))
          
-        if event_df is not None:
-            event_df['TOPO.dst'] = pd.to_numeric(event_df['TOPO.dst'], errors='coerce')
-            event_df['id'] = pd.to_numeric(event_df['id'], errors='coerce')
-            self.last_metric_id = int(event_df['id'].max()) # updates the top metric id read so far 
+        if app_event_df.shape[0] > 0:
+            app_event_df['TOPO.dst'] = pd.to_numeric(app_event_df['TOPO.dst'], errors='coerce')
+            app_event_df['id'] = pd.to_numeric(app_event_df['id'], errors='coerce')
+            self.last_metric_id = int(app_event_df['id'].max()) # updates the top metric id read so far 
+            app_filtered_df = app_event_df[app_event_df['TOPO.dst'].isin(self.observable_node_ids)]   # Partial observation defined in elf.observable_node_ids
 
-            filtered_df = event_df[event_df['TOPO.dst'].isin(self.observable_node_ids)]
-            # print("event_df.shape", event_df.shape)
-            # print("self.observable_node_ids", self.observable_node_ids)
-            # print("filtered_df[\"TOPO.dst\"]",filtered_df["TOPO.dst"])
-
-        #<---IMHERE: collect metrics since last collection
-
+        if agent_event_df.shape[0] > 0:
+            agent_filtered_df = agent_event_df[agent_event_df['node_id'].isin(self.observable_node_ids)]  #Partial observation defined in self.observable_node_ids
+       
         # for node in range(len(self.N)):
         #     if "utilization" in self.N[self.node_id][node][0]:
         #         metrics["node_utilization"][node] = self.sim.topology.G.nodes[node].get("utilization", 0)
@@ -383,9 +358,9 @@ class ManagementAgent:
         #             entry["execution_time"] for entry in self.sim.metrics.data
         #             if entry["node"] == node and entry["message"] == "AgentExecution"
         #         )
-        return filtered_df
+        return app_filtered_df, agent_filtered_df
     
-    def get_management_actions(self, metrics):
+    def get_management_actions(self, app_metrics_df, agent_metrics_df):
         return []
 
     def apply_actions(self, actions):

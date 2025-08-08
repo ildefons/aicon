@@ -123,19 +123,21 @@ class Metrics_online:
             rows = self._get_since_row_m_n_rows(self._buffera, start_index, max_rows)
         return pd.DataFrame(rows)
 
-    def get_event_dataframe_where_time_out_gt(self, metric_type, time_th_ok, max_rows=1000):
+    def get_event_dataframe_where_time_out_gt(self, metric_type, min_time, max_rows=1000):
         try:
-            if type == "app":
+            if metric_type == "app":
                 mybuffer = self._bufferf
                 mybuffer.seek(0)
                 df = pd.read_csv(mybuffer)
-                df_filtered = df[pd.to_numeric(df["time_in"], errors="coerce") > time_th_ok]
+                if df.shape[0]>0:
+                    print(1)
+                df_filtered = df[pd.to_numeric(df["time_in"], errors="coerce") >= min_time]
                 return df_filtered.head(max_rows)
-            elif type == "agent":
+            elif metric_type == "agent":
                 mybuffer = self._buffera
                 mybuffer.seek(0)
                 df = pd.read_csv(mybuffer)
-                df_filtered = df[pd.to_numeric(df["time_sleep_end"], errors="coerce") > time_th_ok]
+                df_filtered = df[pd.to_numeric(df["time_sleep_end"], errors="coerce") >= min_time]
                 return df_filtered.head(max_rows)
             else: 
                 raise Exception("Unknown metric type:", metric_type)
