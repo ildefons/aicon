@@ -239,7 +239,6 @@ class ManagementAgent:
                  node_id, 
                  DES_id, 
                  agent_name, 
-                 N, 
                  sleep_time, 
                  instructions_per_wakeup, 
                  agent_ipt_percentage,
@@ -248,7 +247,6 @@ class ManagementAgent:
         self.node_id = node_id  # Node where agent is colocated
         self.DES_id = DES_id # Id of the DES process for this agent 
         self.agent_name = agent_name # agent name: agent_name = "agent_" + "node" + str(node_id) + "_" + agent_type.__name__
-        self.N = N
         self.sleep_time = sleep_time
         self.instructions_per_wakeup = instructions_per_wakeup
         self.message_queue = simpy.Store(self.sim.env)
@@ -258,8 +256,8 @@ class ManagementAgent:
         self.observable_node_ids = observable_node_ids
 
         self.last_time_agent_start_processing = -1 # we should retrieve all agent events that happened [self.last_time_agent_start_processing, end_of_sleeping]
-
-
+        self.time_of_service = 0 # time spent in previous service
+ 
     def run(self):
         #Registering the DES process into the simulator
         self.sim.des_process_running[self.DES_id] = True
@@ -276,7 +274,9 @@ class ManagementAgent:
             self.logger.info(f"Agent {self.node_id} executing on node {self.node_id}")
 
             #Real logic of the management agent
-            app_metrics_df, agent_metrics_df = self.collect_metrics()
+            duration_previous_cycle = self.sleep_time + self.time_of_service
+            #print("------------------>duration_previous_cycle:",duration_previous_cycle)
+            app_metrics_df, agent_metrics_df = self.collect_metrics(duration_previous_cycle) # we pass the time spent in previous cycle so it can compute the metrics
             self.last_time_agent_start_processing = time_sleep_end # update for next iteration
             actions = self.get_management_actions(app_metrics_df, agent_metrics_df)   # main method to be customized
             self.apply_actions(actions)
@@ -284,10 +284,10 @@ class ManagementAgent:
             #Compute time working as self.instructions_per_wakeup/float(node["IPT"])  
             att_node = self.sim.topology.G.nodes[self.node_id]
             available_ipt = self.agent_ipt_percentage * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
-            time_of_service = self.instructions_per_wakeup / available_ipt  #float(att_node["IPT"])
+            self.time_of_service = self.instructions_per_wakeup / available_ipt  #float(att_node["IPT"])
             
             #Simulate agent' time of service
-            yield self.sim.env.timeout(time_of_service) # Work 
+            yield self.sim.env.timeout(self.time_of_service) # Work 
             time_processing_end = self.sim.env.now           
 
             #Update agent metrics
@@ -306,7 +306,7 @@ class ManagementAgent:
         self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
         
 
-    def collect_metrics(self):
+    def collect_metrics(self, duration_previous_cycle):
         # metrics = {
         #     "node_utilization": {}, "message_latency": {}, "instructions": {},
         #     "message_count": {}, "agent_execution_time": {}
@@ -336,6 +336,32 @@ class ManagementAgent:
         if agent_event_df.shape[0] > 0:
             agent_filtered_df = agent_event_df[agent_event_df['node_id'].isin(self.observable_node_ids)]  #Partial observation defined in self.observable_node_ids
        
+        # call custom metrics
+        #def agent_node_utilization(agent_event_df):
+        def service_node_utilization(df, duration_previous_cycle, id):
+            print(1)
+            """
+            Returns the utilization(%) of a specific module during the previous cycle
+            """
+            g = df.groupby(["DES.dst"]).agg({"service": ['mean', 'sum', 'count']})
+            # g.reset_index(inplace=True)
+            # h = pd.DataFrame()
+            value = 0
+            print(self.agent_name)
+            if duration_previous_cycle != 0:
+                value = g.xs(("service", "sum"), axis=1).get(id, 0)*100/duration_previous_cycle
+            ret = {
+                "metric": service_node_utilization.__name__,
+                "node_id": id,
+                "value": value
+            }
+            #h["node_id"] = g["DES.des"]
+            #h["utilization"] = g[g.module == service]["service"]["sum"]*100 / duration_previous_cycle
+            # return h
+            return ret
+        
+        service_node_utilization_ret = service_node_utilization(app_event_df, duration_previous_cycle, id = self.observable_node_ids[0])
+
         # for node in range(len(self.N)):
         #     if "utilization" in self.N[self.node_id][node][0]:
         #         metrics["node_utilization"][node] = self.sim.topology.G.nodes[node].get("utilization", 0)
@@ -420,7 +446,8 @@ class ManagementAgentNetwork:
             instructions_per_wakeup = agent_json["instructions_per_wakeup"]
             agent_ipt_percentage = agent_json["agent_ipt_percentage"]
             observable_node_ids = agent_json["observable_node_ids"]
-            N = [] # ILDE: TBD
+            observable_node_ids.append(node_id) # by default, we add the node itself to the list of observable nodes
+            observable_node_ids = list(set(observable_node_ids))
             myId = self.sim._Sim__get_id_process()#__get_id_process() is private so I overcome the privatenss explicitly (not nice)
             agent_name = "agent_" + "node" + str(node_id) + "_" + agent_type.__name__
 
@@ -428,7 +455,7 @@ class ManagementAgentNetwork:
             agent_ipt_percentage_01 = max(0, min(1, agent_ipt_percentage))
 
             observable_node_ids = agent_json["observable_node_ids"]
-            agent = agent_type(self.sim, node_id, myId, agent_name, N, sleep_time, instructions_per_wakeup, 
+            agent = agent_type(self.sim, node_id, myId, agent_name, sleep_time, instructions_per_wakeup, 
                                agent_ipt_percentage_01, observable_node_ids)
             self.agents[node_id] = agent
             # start gant process        
