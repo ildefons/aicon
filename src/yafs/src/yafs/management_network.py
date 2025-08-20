@@ -8,6 +8,8 @@ import logging
 
 import pandas as pd
 
+import inspect
+
 # class ManagementAgent:
 #     def __init__(self, sim, node_id, N, wake_up_interval, instructions_per_wakeup):
 #         self.sim = sim
@@ -306,6 +308,85 @@ class ManagementAgent:
         self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
         
 
+    # custom metrics
+    def agent_node_utilization(self, df,  duration_previous_cycle):
+            
+        """
+        Returns the service utilization (%) for a list of a observable nodes
+        """
+
+        results = []
+        for id in self.observable_node_ids:
+            value = df[df.node_id==id].service.sum()
+            results.append({
+                "metric": inspect.currentframe().f_code.co_name,
+                "node_id": id,
+                "value": value
+            })
+
+        return results
+
+    def service_node_utilization(self, df, duration_previous_cycle):
+        
+        """
+        Returns the service utilization (%) for a list of a observable nodes
+        """
+
+        results = []
+        for id in self.observable_node_ids:
+            value = 0
+            value = df[df["DES.dst"]==id].service.sum()
+            results.append({
+                "metric": inspect.currentframe().f_code.co_name,
+                "node_id": id,
+                "value": value
+            })
+
+        return results
+
+    def node_service_requests_in(self):
+
+        """
+        Returns the number of service requests for each DESid = (app, service/module, node) ~ messages "put" in the 
+        """
+
+        value = 0
+        results = []
+
+        for id in self.observable_node_ids:
+            print(id)
+
+
+        results.append({
+            "metric": inspect.currentframe().f_code.co_name,
+            "node_id": id,
+            "value": value
+            })
+        
+        return results
+
+    
+    def node_service_requests_out(self):
+
+        """
+        Returns the number of service requests for each DESid = (app, service/module, node) ~ messages "put" in the 
+        """
+
+        value = 0
+        results = []
+
+        for id in self.observable_node_ids:
+            print(id)
+
+
+        results.append({
+            "metric": inspect.currentframe().f_code.co_name,
+            "node_id": id,
+            "value": value
+            })
+        
+        return results
+
     def collect_metrics(self, duration_previous_cycle):
         # metrics = {
         #     "node_utilization": {}, "message_latency": {}, "instructions": {},
@@ -336,32 +417,10 @@ class ManagementAgent:
         if agent_event_df.shape[0] > 0:
             agent_filtered_df = agent_event_df[agent_event_df['node_id'].isin(self.observable_node_ids)]  #Partial observation defined in self.observable_node_ids
        
-        # call custom metrics
-        #def agent_node_utilization(agent_event_df):
-        def service_node_utilization(df, duration_previous_cycle, id):
-            print(1)
-            """
-            Returns the utilization(%) of a specific module during the previous cycle
-            """
-            g = df.groupby(["DES.dst"]).agg({"service": ['mean', 'sum', 'count']})
-            # g.reset_index(inplace=True)
-            # h = pd.DataFrame()
-            value = 0
-            print(self.agent_name)
-            if duration_previous_cycle != 0:
-                value = g.xs(("service", "sum"), axis=1).get(id, 0)*100/duration_previous_cycle
-            ret = {
-                "metric": service_node_utilization.__name__,
-                "node_id": id,
-                "value": value
-            }
-            #h["node_id"] = g["DES.des"]
-            #h["utilization"] = g[g.module == service]["service"]["sum"]*100 / duration_previous_cycle
-            # return h
-            return ret
-        
-        service_node_utilization_ret = service_node_utilization(app_event_df, duration_previous_cycle, id = self.observable_node_ids[0])
-
+         
+        service_node_utilization_ret = self.service_node_utilization(app_event_df, duration_previous_cycle)
+        agent_node_utilization = self.agent_node_utilization(agent_event_df, duration_previous_cycle)
+        node_service_requests_in = self.node_service_requests_in()
         # for node in range(len(self.N)):
         #     if "utilization" in self.N[self.node_id][node][0]:
         #         metrics["node_utilization"][node] = self.sim.topology.G.nodes[node].get("utilization", 0)
@@ -454,7 +513,7 @@ class ManagementAgentNetwork:
             #make sure agent_ipt_percentage is within range [0,1]. If not floor it between [0,1] + log a warning
             agent_ipt_percentage_01 = max(0, min(1, agent_ipt_percentage))
 
-            observable_node_ids = agent_json["observable_node_ids"]
+            #observable_node_ids = agent_json["observable_node_ids"]
             agent = agent_type(self.sim, node_id, myId, agent_name, sleep_time, instructions_per_wakeup, 
                                agent_ipt_percentage_01, observable_node_ids)
             self.agents[node_id] = agent
