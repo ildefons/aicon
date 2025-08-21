@@ -211,8 +211,9 @@ class Sim:
                     msg.path = copy.copy(path)
                     msg.app_name = app_name
                     msg.idDES = DES_dst[idx]
-
+                    #print("net", message.name, "pipe size before put:",len(self.network_ctrl_pipe.items), " time now:", self.env.now)
                     self.network_ctrl_pipe.put(msg)
+                    #print("net", message.name, "pipe size after put:",len(self.network_ctrl_pipe.items), " time now:", self.env.now)
         except KeyError:
             self.logger.warning("(#DES:%i)\t--- Unreacheable DST:\t%s " % (idDES, message.name))
 
@@ -227,8 +228,9 @@ class Sim:
         self.last_busy_time = {}  # dict(zip(edges, [0.0] * len(edges)))
 
         while not self.stop:
+            #print("1 pipe size before get:",len(self.network_ctrl_pipe.items), " time now:", self.env.now)
             message = yield self.network_ctrl_pipe.get()
-
+            #print("2 pipe size before get:",len(self.network_ctrl_pipe.items), " time now:", self.env.now)
             # print "NetworkProcess --- Current time %d " %self.env.now
             # print "name " + message.name
             # print "Path:",message.path
@@ -239,16 +241,17 @@ class Sim:
 
             # If same SRC and PATH or the message has achieved the penultimate node to reach the dst
             if not message.path or message.path[-1] == message.dst_int or len(message.path)==1:
-
                 pipe_id = "%s%s%i" %(message.app_name,message.dst,message.idDES)  # app_name + module_name (dst) + idDES
                 # Timestamp reception message in the module
                 message.timestamp_rec = self.env.now
                 # The message is sent to the module.pipe
-                self.consumer_pipes[pipe_id].put(message)
+                self.consumer_pipes[pipe_id].put(message)  
+                print("inside network process, check consumer_pipe after put",pipe_id, " size:", len(self.consumer_pipes[pipe_id].items), " time:",self.env.now)
+
             else:
                 # The message is sent at first time or it sent more times.
                 # if message.dst_int < 0:
-
+               
                 if (isinstance(message.dst_int , str) and len(message.dst_int ) == 0) or \
                         (isinstance(message.dst_int , int) and message.dst_int  < 0):
                     src_int = message.path[0]
@@ -298,6 +301,7 @@ class Sim:
                     # print "-" * 30
 
                     self.last_busy_time[link] = last_used
+                    #print("before __wait_messages, time: ", self.env.now)
                     self.env.process(self.__wait_message(message, latency_msg_link, shift_time))
                 except:
                     #This fact is produced when a node or edge the topology is changed or disappeared
@@ -394,7 +398,7 @@ class Sim:
             yield self.env.timeout(nextTime)
             if self.des_process_running[idDES]:
                 self.logger.debug("(App:%s#DES:%i)\tModule - Generating Message: %s \t(T:%d)" % (name_app, idDES, message.name,self.env.now))
-
+                #print("HELO---->",self.env.now)
                 msg = copy.copy(message)
                 msg.timestamp = self.env.now
                 msg.id = self.__getIDMessage()
@@ -516,6 +520,10 @@ class Sim:
 
             # print "Source DES ",sourceDES
             # print "-" * 50
+            
+            #ILDE: get the size of the input queue. Very usefull metric to know whether in rate is too high or service QoS to high
+            in_buffer_size_des = len(self.consumer_pipes["%s%s%i"%(app,module,des)].items)
+
 
             self.metrics.insert(
                 {"id":message.id,"type": type, "app": app, "module": module, "message": message.name,
@@ -524,7 +532,8 @@ class Sim:
 
                  "service": time_service, "time_in": self.env.now,
                  "time_out": time_service + self.env.now, "time_emit": float(message.timestamp),
-                 "time_reception": float(message.timestamp_rec)
+                 "time_reception": float(message.timestamp_rec),
+                 "in_buffer_size_des": in_buffer_size_des #ILDE
 
                  })
 
@@ -593,11 +602,16 @@ class Sim:
         self.logger.debug("Added_Process - Module Consumer: %s\t#DES:%i" % (module, ides))
         while not self.stop and self.des_process_running[ides]:
             if self.des_process_running[ides]:
+                #print("check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
+                print("inside consumer_module, check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
+                if len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items):
+                    print("check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
+                print(1,self.env.now)
                 msg = yield self.consumer_pipes["%s%s%i"%(app_name,module,ides)].get()
                 # One pipe for each module name
-
+                print(2,self.env.now)
                 m = self.apps[app_name].services[module]
-
+                print(3,self.env.now)
                 # for ser in m:
                 #     if "message_in" in ser.keys():
                 #         try:
@@ -607,7 +621,9 @@ class Sim:
 
                 # print "Registers len: %i" %len(register_consumer_msg)
                 doBefore = False
+                print(4,self.env.now)
                 for register in register_consumer_msg:
+                    print(5, self.env.now)
                     if msg.name == register["message_in"].name:
                         # The message can be treated by this module
                         """
@@ -1288,4 +1304,5 @@ class Sim:
         if not test_initial_deploy:
             self.env.run(until) #This does not stop the simpy.simulation at time. We have to force the stop
 
+        self.metrics.save_to_files()
         self.metrics.close()

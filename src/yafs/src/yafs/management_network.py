@@ -269,11 +269,11 @@ class ManagementAgent:
         
         while not self.stop and self.sim.des_process_running[self.DES_id]:
             #Simulated wake up/oeration cycle
-            self.logger.info(f"Agent {self.node_id} waking at {self.sim.env.now}, colocated on node {self.node_id}")
+            #self.logger.info(f"Agent {self.node_id} waking at {self.sim.env.now}, colocated on node {self.node_id}")
             time_sleep_start = self.sim.env.now
             yield self.sim.env.timeout(self.sleep_time)  # Sleep
             time_sleep_end = self.sim.env.now
-            self.logger.info(f"Agent {self.node_id} executing on node {self.node_id}")
+            #self.logger.info(f"Agent {self.node_id} executing on node {self.node_id}")
 
             #Real logic of the management agent
             duration_previous_cycle = self.sleep_time + self.time_of_service
@@ -305,7 +305,7 @@ class ManagementAgent:
                          "service": float(time_processing_end-time_sleep_end)
                          })
 
-        self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
+        #self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
         
 
     # custom metrics

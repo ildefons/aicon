@@ -35,7 +35,7 @@ class CloudAgent(ManagementAgent):
     def get_management_actions(self, app_metrics_df, agent_metrics_df):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
-        print("CloudAgent.get_management_action()")
+        #print("CloudAgent.get_management_action()")
 
         actions = []
         # incoming_messages = [
@@ -51,7 +51,7 @@ class SensorAgent(ManagementAgent):
     def get_management_actions(self, app_metrics_df, agent_metrics_df):
         """Sensor monitors metrics (no actions for now)."""
 
-        print("SensorAgent.get_management_action()")
+        #print("SensorAgent.get_management_action()")
 
         return []  # Extensible for future logic
 
@@ -59,7 +59,7 @@ class ActuatorAgent(ManagementAgent):
     def get_management_actions(self, app_metrics_df, agent_metrics_df):
         """Actuator monitors metrics (no actions for now)."""
 
-        print("ActuatorAgent.get_management_action()")
+        #print("ActuatorAgent.get_management_action()")
 
         return []  # Extensible for future logic
 
@@ -75,17 +75,17 @@ class MinimunPath(Selection):
         node_src = topology_src
         DES_dst = alloc_module[app_name][message.dst]
 
-        print(("GET PATH"))
-        print(("\tNode _ src (id_topology): %i" %node_src))
-        print(("\tRequest service: %s " %message.dst))
-        print(("\tProcess serving that service: %s " %DES_dst))
+        # print(("GET PATH"))
+        # print(("\tNode _ src (id_topology): %i" %node_src))
+        # print(("\tRequest service: %s " %message.dst))
+        # print(("\tProcess serving that service: %s " %DES_dst))
 
         bestPath = []
         bestDES = []
 
         for des in DES_dst: ## In this case, there are only one deployment
             dst_node = alloc_DES[des]
-            print(("\t\t Looking the path to id_node: %i" %dst_node))
+            #print(("\t\t Looking the path to id_node: %i" %dst_node))
 
             path = list(nx.shortest_path(sim.topology.G, source=node_src, target=dst_node))
 
@@ -221,7 +221,7 @@ def create_json_topology():
     sensor_dev   = {"id": 1, "model": "sensor-device", "IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
     actuator_dev = {"id": 2, "model": "actuator-device", "IPT": 100 * 10 ** 7, "RAM": 4000,"COST": 3, "WATT": 40.0}
 
-    link1 = {"s": 0, "d": 1, "BW": 1, "PR": 10}
+    link1 = {"s": 0, "d": 1, "BW": 1, "PR": 5}
     link2 = {"s": 0, "d": 2, "BW": 1, "PR": 1}
 
     topology_json["entity"].append(cloud_dev)
@@ -286,7 +286,7 @@ def main(simulated_time):
                           "module": "Dashboard"}) # ILDE  app.get_sink_modules()})
 
     #In addition, a source includes a distribution function:
-    dDistribution = deterministic_distribution(name="Deterministic",time=100)
+    dDistribution = deterministic_distribution(name="Deterministic",time=0.1)
     pop.set_src_control({"model": "sensor-device", 
                          "number":1,
                          "message": app.get_message("M.A"), 

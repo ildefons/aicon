@@ -13,6 +13,8 @@ class Metrics_online:
     WATT_UPTIME = "byUptime"
 
     def __init__(self, default_results_path=None):
+        #ILDE
+        self.default_results_path = default_results_path
         # In-memory buffers instead of files
         self._bufferf = io.StringIO()
         self._bufferl = io.StringIO()
@@ -27,7 +29,8 @@ class Metrics_online:
             "id","type", "app", "module", "message",
             "DES.src","DES.dst","TOPO.src","TOPO.dst",
             "module.src","service", "time_in","time_out",
-            "time_emit","time_reception"
+            "time_emit","time_reception",
+            "in_buffer_size_des" #ILDE
         ]
         self._link_columns = [
             "id","type", "src", "dst", "app", "latency",
@@ -51,7 +54,8 @@ class Metrics_online:
             value["message"], value["DES.src"], value["DES.dst"],
             value["TOPO.src"], value["TOPO.dst"], value["module.src"],
             value["service"], value["time_in"], value["time_out"],
-            value["time_emit"], value["time_reception"]
+            value["time_emit"], value["time_reception"],
+            value["in_buffer_size_des"]
         ])
 
     def insert_link(self, value):
@@ -156,3 +160,20 @@ class Metrics_online:
         self._bufferf.close()
         self._bufferl.close()
         self._buffera.close()
+
+    #ILDE
+    def save_to_files(self):
+        """Write the contents of the buffers to CSV files."""
+        # Ensure the path is set
+        if not self.default_results_path:
+            raise ValueError("No output path specified for saving CSV files.")
+
+        # Write each buffer to its corresponding file
+        with open(f"{self.default_results_path}.csv", "w", newline='') as filef:
+            filef.write(self._bufferf.getvalue())
+
+        with open(f"{self.default_results_path}_link.csv", "w", newline='') as filel:
+            filel.write(self._bufferl.getvalue())
+
+        with open(f"{self.default_results_path}_agent.csv", "w", newline='') as filea:
+            filea.write(self._buffera.getvalue())
