@@ -317,7 +317,11 @@ class ManagementAgent:
 
         results = []
         for id in self.observable_node_ids:
-            value = df[df.node_id==id].service.sum()
+            value = 0.0
+            if df is None or not isinstance(df, pd.DataFrame):
+                value = 0.0
+            else:
+                value = df[df.node_id==id].service.sum()
             results.append({
                 "metric": inspect.currentframe().f_code.co_name,
                 "node_id": id,
@@ -334,8 +338,11 @@ class ManagementAgent:
 
         results = []
         for id in self.observable_node_ids:
-            value = 0
-            value = df[df["DES.dst"]==id].service.sum()
+            value = 0.0
+            if df is None or not isinstance(df, pd.DataFrame):
+                value = 0.0
+            else:
+                value = df[df["DES.dst"]==id].service.sum()
             results.append({
                 "metric": inspect.currentframe().f_code.co_name,
                 "node_id": id,
@@ -344,48 +351,51 @@ class ManagementAgent:
 
         return results
 
-    def node_service_requests_in(self):
+    def node_service_requests_in(self, df):
 
         """
-        Returns the number of service requests for each DESid = (app, service/module, node) ~ messages "put" in the 
-        """
-
-        value = 0
-        results = []
-
-        for id in self.observable_node_ids:
-            print(id)
-
-
-        results.append({
-            "metric": inspect.currentframe().f_code.co_name,
-            "node_id": id,
-            "value": value
-            })
-        
-        return results
-
-    
-    def node_service_requests_out(self):
-
-        """
-        Returns the number of service requests for each DESid = (app, service/module, node) ~ messages "put" in the 
+        Returns the number of service requests waiting to be served by the node/service in each observable node/DES_process 
+        (note: BTB only 1 app service per node, so is the same a sevice~node) 
         """
 
         value = 0
         results = []
 
         for id in self.observable_node_ids:
-            print(id)
-
-
-        results.append({
-            "metric": inspect.currentframe().f_code.co_name,
-            "node_id": id,
-            "value": value
-            })
+            value = 0.0
+            if df is None or not isinstance(df, pd.DataFrame):
+                value = 0.0
+            else:
+                df2 = df[df["TOPO.dst"]==id]
+                if df2.shape[0] > 0:
+                    value = df2.loc[df2['time_out'].idxmax(), 'in_buffer_size_des']
+                else:
+                    value = 0.0
+            results.append({
+                "metric": inspect.currentframe().f_code.co_name,
+                "node_id": id,
+                "value": value
+                })
         
         return results
+  
+    def net_buffer_size(self, df):
+ 
+        """
+        Returns the most current network buffer size 
+        """
+
+        value = 0.0
+        if df is None or not isinstance(df, pd.DataFrame):
+            value = 0.0
+        else:
+            value = df.loc[df['ctime'].idxmax(), 'buffer']
+        ret ={"metric": inspect.currentframe().f_code.co_name,
+              "node_id": self.node_id,
+              "value": value
+             }
+        
+        return ret
 
     def collect_metrics(self, duration_previous_cycle):
         # metrics = {
@@ -395,6 +405,7 @@ class ManagementAgent:
         app_event_df = None
         app_filtered_df = None
         agent_filtered_df = None
+        net_filtered_df = None
         try:
             app_event_df = self.sim.metrics.get_event_dataframe_where_time_out_gt(metric_type="app", 
                                                                               min_time=self.last_time_agent_start_processing,
@@ -402,7 +413,10 @@ class ManagementAgent:
             agent_event_df = self.sim.metrics.get_event_dataframe_where_time_out_gt(metric_type="agent", 
                                                                                   min_time=self.last_time_agent_start_processing,
                                                                                   max_rows=10**6)
-
+            
+            net_event_df = self.sim.metrics.get_event_dataframe_where_time_out_gt(metric_type="net", 
+                                                                                  min_time=self.last_time_agent_start_processing,
+                                                                                  max_rows=10**6)
         except IndexError as e:
             print("Error: Entry index is out of bounds.")
         except Exception as e:
@@ -417,10 +431,16 @@ class ManagementAgent:
         if agent_event_df.shape[0] > 0:
             agent_filtered_df = agent_event_df[agent_event_df['node_id'].isin(self.observable_node_ids)]  #Partial observation defined in self.observable_node_ids
        
-         
-        service_node_utilization_ret = self.service_node_utilization(app_event_df, duration_previous_cycle)
-        agent_node_utilization = self.agent_node_utilization(agent_event_df, duration_previous_cycle)
-        node_service_requests_in = self.node_service_requests_in()
+        if net_event_df.shape[0] > 0:
+            net_filtered_df = net_event_df[net_event_df['src'].isin(self.observable_node_ids) |
+                                           net_event_df['dst'].isin(self.observable_node_ids) ]  #Partial observation defined in self.observable_node_ids
+       
+        # Computation of actual metrics delivered to the agent
+        service_node_utilization_ret = self.service_node_utilization(app_filtered_df, duration_previous_cycle)
+        agent_node_utilization = self.agent_node_utilization(agent_filtered_df, duration_previous_cycle)
+        net_buffer_size = self.net_buffer_size(net_filtered_df)
+        node_service_requests_in = self.node_service_requests_in(app_filtered_df)
+        
         # for node in range(len(self.N)):
         #     if "utilization" in self.N[self.node_id][node][0]:
         #         metrics["node_utilization"][node] = self.sim.topology.G.nodes[node].get("utilization", 0)

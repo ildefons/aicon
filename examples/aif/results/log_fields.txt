@@ -1,3 +1,6 @@
+app logs:
+---------
+
 id: id of the log entry
 type: COMP_M or SINL_M
 app: application name
@@ -14,6 +17,12 @@ time_in: time message started being processed by module
 time_out: time message ended being processed by module
 time_emit: time message started to travel the input communication link (opinion from stat code) 
 time_reception: time message enters in module instance queue (same as time_in if queue empty)
+
+1,COMP_M,SimpleCase,ServiceA,M.A,0,2,1,0,Camera,0.008,10.011,10.018999999999998,0.01,10.011,0
+1,SINK_M,SimpleCase,Dashboard,M.B,2,1,0,2,ServiceA,0.06,11.019499999999999,11.0795,10.018999999999998,11.019499999999999,0
+2,COMP_M,SimpleCase,ServiceA,M.A,0,2,1,0,Camera,0.008,20.011999999999997,20.019999999999996,0.02,20.011999999999997,0
+2,SINK_M,SimpleCase,Dashboard,M.B,2,1,0,2,ServiceA,0.06,21.020499999999995,21.080499999999994,20.019999999999996,21.020499999999995,0
+
 
 example:
 44,COMP_M,SimpleCase,ServiceA,M.A,0,2,1,0,Camera,0.004,
@@ -41,3 +50,30 @@ def compute_times_df(self):
     self.df["time_total_response"] = self.df["time_response"] + self.df["time_latency"]
 
 
+Link logs:
+----------
+
+id:
+type:
+src:
+dst:
+app:
+latency:
+message
+ctime: time the message is sent
+size:
+buffer:
+
+Examples:
+15,LINK,1,0,SimpleCase,10.001,M.A,1500,1000,0
+15,LINK,0,2,SimpleCase,1.0005,M.B,1510.009,500,0
+16,LINK,1,0,SimpleCase,10.001,M.A,1600,1000,0
+16,LINK,0,2,SimpleCase,1.0005,M.B,1610.009,500,0
+17,LINK,1,0,SimpleCase,10.001,M.A,1700,1000,0
+17,LINK,0,2,SimpleCase,1.0005,M.B,1710.009,500,0
+18,LINK,1,0,SimpleCase,10.001,M.A,1800,1000,0
+18,LINK,0,2,SimpleCase,1.0005,M.B,1810.009,500,0
+
+Note id is repeatedtwice. Why? is reffering to a whole aplication pipe sensor(1)->service(0)->dashboard(2)
+
+Question: What's buffer? (not 100% sure) I think is the number o messages currently being transmitted in a particular link

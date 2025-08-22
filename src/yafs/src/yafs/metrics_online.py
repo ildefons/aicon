@@ -133,8 +133,6 @@ class Metrics_online:
                 mybuffer = self._bufferf
                 mybuffer.seek(0)
                 df = pd.read_csv(mybuffer)
-                if df.shape[0]>0:
-                    print(1)
                 df_filtered = df[pd.to_numeric(df["time_in"], errors="coerce") >= min_time]
                 return df_filtered.head(max_rows)
             elif metric_type == "agent":
@@ -142,6 +140,12 @@ class Metrics_online:
                 mybuffer.seek(0)
                 df = pd.read_csv(mybuffer)
                 df_filtered = df[pd.to_numeric(df["time_sleep_end"], errors="coerce") >= min_time]
+                return df_filtered.head(max_rows)
+            elif metric_type == "net":
+                mybuffer = self._bufferl
+                mybuffer.seek(0)
+                df = pd.read_csv(mybuffer)
+                df_filtered = df[pd.to_numeric(df["ctime"], errors="coerce") >= min_time]
                 return df_filtered.head(max_rows)
             else: 
                 raise Exception("Unknown metric type:", metric_type)

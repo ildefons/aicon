@@ -246,7 +246,7 @@ class Sim:
                 message.timestamp_rec = self.env.now
                 # The message is sent to the module.pipe
                 self.consumer_pipes[pipe_id].put(message)  
-                print("inside network process, check consumer_pipe after put",pipe_id, " size:", len(self.consumer_pipes[pipe_id].items), " time:",self.env.now)
+                #print("inside network process, check consumer_pipe after put",pipe_id, " size:", len(self.consumer_pipes[pipe_id].items), " time:",self.env.now)
 
             else:
                 # The message is sent at first time or it sent more times.
@@ -603,15 +603,15 @@ class Sim:
         while not self.stop and self.des_process_running[ides]:
             if self.des_process_running[ides]:
                 #print("check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
-                print("inside consumer_module, check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
-                if len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items):
-                    print("check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
-                print(1,self.env.now)
+                # print("inside consumer_module, check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
+                # if len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items):
+                #     print("check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
+                #print(1,self.env.now)
                 msg = yield self.consumer_pipes["%s%s%i"%(app_name,module,ides)].get()
                 # One pipe for each module name
-                print(2,self.env.now)
+                #print(2,self.env.now)
                 m = self.apps[app_name].services[module]
-                print(3,self.env.now)
+                #print(3,self.env.now)
                 # for ser in m:
                 #     if "message_in" in ser.keys():
                 #         try:
@@ -621,9 +621,9 @@ class Sim:
 
                 # print "Registers len: %i" %len(register_consumer_msg)
                 doBefore = False
-                print(4,self.env.now)
+                #print(4,self.env.now)
                 for register in register_consumer_msg:
-                    print(5, self.env.now)
+                    #print(5, self.env.now)
                     if msg.name == register["message_in"].name:
                         # The message can be treated by this module
                         """
