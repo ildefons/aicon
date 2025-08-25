@@ -30,7 +30,8 @@ class Metrics_online:
             "DES.src","DES.dst","TOPO.src","TOPO.dst",
             "module.src","service", "time_in","time_out",
             "time_emit","time_reception",
-            "in_buffer_size_des" #ILDE
+            "in_buffer_size_des", #ILDE
+            "qos" #QoS
         ]
         self._link_columns = [
             "id","type", "src", "dst", "app", "latency",
@@ -55,7 +56,7 @@ class Metrics_online:
             value["TOPO.src"], value["TOPO.dst"], value["module.src"],
             value["service"], value["time_in"], value["time_out"],
             value["time_emit"], value["time_reception"],
-            value["in_buffer_size_des"]
+            value["in_buffer_size_des"], value["qos"]
         ])
 
     def insert_link(self, value):

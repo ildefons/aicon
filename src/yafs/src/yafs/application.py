@@ -1,6 +1,57 @@
 # -*- coding: utf-8 -*-
 import random
 
+# ILDE: QoS related code
+class LinearQoS:
+    def __init__(self, L: float, R: float, R_inst: float = None): # R_inst is the number of instructions corresponding to R
+                                                                  # L, R: in [0,1]
+        if L >= R:
+            raise ValueError("L must be strictly less than R.")
+        self.L = L
+        self.R = R
+        self.R_inst = R_inst
+
+        # define the clamped linear function
+        def linear_clamped(x):
+            if self.R_inst is None:
+                raise ValueError("R_inst must be defined to the minimum number of instructions to get maximum QoS")
+            
+            x = x/self.R_inst # normalize
+            
+            if x <= self.L:
+                return 0.0
+            elif x >= self.R:
+                return 100.0
+            else:
+                return 100.0 * (x - self.L) / (self.R - self.L)
+
+        self.f = linear_clamped   # store as attribute
+
+    def __call__(self, x: float) -> float:
+        """Optionally make QoS callable directly"""
+        return self.f(x)
+    
+#ILDE: Other QoS could be more appropiate depending of the algorithm being modelled:
+# For many modern algorithms, the relationship is highly non-linear. Here are common cases where the linear model fails:
+
+# 1) Diminishing Returns (Logarithmic/Exponential Decay): This is perhaps the most common pattern. 
+
+# 2) Huge quality gains happen in the first few iterations, and then each subsequent iteration provides less and less improvement.
+# Example: Most machine learning training and inference. The loss drops very quickly at first and then plateaus.
+# Model: A logarithmic model (QoS = a * log(iterations) + b) is often a better fit.
+
+# 3) "Aha!" Moments (Step Function): The quality might remain near zero for many iterations and then suddenly jump to a high value when the algorithm finds a good solution or converges.
+# Example: Some combinatorial optimization algorithms (e.g., genetic algorithms, constraint solvers). They search and search until they suddenly find a valid, high-quality solution.
+# Model: A step function or a very steep sigmoid function.
+
+# 4) Sigmoid / S-Curve: A combination of the above. Slow initial progress, then a period of rapid, near-linear improvement, followed by a plateau with diminishing returns. This is a very common pattern.
+# Model: A sigmoid function qos=LinearQoS()like QoS = 100 / (1 + e^(-k*(iterations - M))) where M is the midpoint and k controls the steepness.
+
+# 5) Unpredictable / Noisy Progress: The quality might oscillate, go down before it goes up, or be stochastic.
+# Example: Training a neural network with stochastic gradient descent. The loss curve is famously bumpy.
+# Model: Very hard to model precisely. Often requires probabilistic or worst-case modeling.
+
+
 class Message:
     """
     A message is set by the following values:
@@ -26,7 +77,7 @@ class Message:
         app_name (str): the name of the application
     """
 
-    def __init__(self, name, src, dst, instructions=0, bytes=0,broadcasting=False):
+    def __init__(self, name, src, dst, instructions=0, bytes=0,broadcasting=False, qos = None): # ILDE: I added qos so I can monitor/control QoS aaf of instructions (default)
         self.name = name
         self.src = src
         self.dst = dst
@@ -45,6 +96,13 @@ class Message:
         self.id = -1
 
         self.original_DES_src = None #This attribute identifies the user when multiple users are in the same node
+
+        #ILDE: QoS related code
+        self.qos = None
+        if qos is not None:
+            self.qos = qos
+            self.qos.R_inst = instructions  #ILDE: I am assuming message.instructions is the min number of instructions to get 100% QoS 
+
 
     def __str__(self):
         print  ("{--")

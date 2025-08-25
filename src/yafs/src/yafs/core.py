@@ -208,6 +208,8 @@ class Sim:
                 #May be, the selector of path decides broadcasting multiples paths
                 for idx,path in enumerate(paths):
                     msg = copy.copy(message)
+                    # if message.name=="M.A":
+                    #     print(1)
                     msg.path = copy.copy(path)
                     msg.app_name = app_name
                     msg.idDES = DES_dst[idx]
@@ -399,6 +401,8 @@ class Sim:
             if self.des_process_running[idDES]:
                 self.logger.debug("(App:%s#DES:%i)\tModule - Generating Message: %s \t(T:%d)" % (name_app, idDES, message.name,self.env.now))
                 #print("HELO---->",self.env.now)
+                # if message.name == 'M.A':
+                #     print(1)
                 msg = copy.copy(message)
                 msg.timestamp = self.env.now
                 msg.id = self.__getIDMessage()
@@ -412,6 +416,10 @@ class Sim:
             """
             It computes the service time in processing a message and record this event
             """
+            metric_qos = None
+            if message.qos is not None: # ILDE: meaning the user explicitly created a QoS object when constructed the first message object 
+                metric_qos = message.qos(message.inst)
+
             if module in self.apps[app].get_sink_modules():
                 """
                 The module is a SINK (Actuactor)
@@ -533,7 +541,8 @@ class Sim:
                  "service": time_service, "time_in": self.env.now,
                  "time_out": time_service + self.env.now, "time_emit": float(message.timestamp),
                  "time_reception": float(message.timestamp_rec),
-                 "in_buffer_size_des": in_buffer_size_des #ILDE
+                 "in_buffer_size_des": in_buffer_size_des, #ILDE
+                 "qos": metric_qos #ILDE
 
                  })
 
@@ -587,6 +596,8 @@ class Sim:
                 self.logger.debug(
                     "(App:%s#DES:%i#%s)\tModule - Generating Message:\t%s" % (app_name, idDES, module, message.name))
                 msg = copy.copy(message)
+                if message.name=="M.A":
+                    print(1)
                 msg.timestamp = self.env.now
                 msg.original_DES_src = idDES
 

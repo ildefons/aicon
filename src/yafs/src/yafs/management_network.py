@@ -321,7 +321,7 @@ class ManagementAgent:
             if df is None or not isinstance(df, pd.DataFrame):
                 value = 0.0
             else:
-                value = df[df.node_id==id].service.sum()
+                value = df[df.node_id==id].service.sum()*100/duration_previous_cycle
             results.append({
                 "metric": inspect.currentframe().f_code.co_name,
                 "node_id": id,
@@ -342,7 +342,10 @@ class ManagementAgent:
             if df is None or not isinstance(df, pd.DataFrame):
                 value = 0.0
             else:
-                value = df[df["DES.dst"]==id].service.sum()
+                value = df[df["DES.dst"]==id].service.sum()*100/duration_previous_cycle
+                value = min(value,100) # in some cases, the "update_metrics function" adds the entry into the DB and still didnt do the last "yield self.env.timeout(service_time)". This needs to be fixed but in the meantime I do this flooring
+                if value > 100:
+                    print(1)
             results.append({
                 "metric": inspect.currentframe().f_code.co_name,
                 "node_id": id,
@@ -351,10 +354,10 @@ class ManagementAgent:
 
         return results
 
-    def node_service_requests_in(self, df):
+    def node_requests_waiting_in(self, df):
 
         """
-        Returns the number of service requests waiting to be served by the node/service in each observable node/DES_process 
+        Returns the number of service requests waiting to be served by the node in each observable node 
         (note: BTB only 1 app service per node, so is the same a sevice~node) 
         """
 
@@ -379,6 +382,31 @@ class ManagementAgent:
         
         return results
   
+    def node_requests_out(self, df):
+
+        """
+        Returns the number of service requests serviced by the node in each observable node since the begining of the simulation
+        (note: BTB only 1 app service per node, so is the same a sevice~node) 
+        """
+
+        value = 0
+        results = []
+
+        for id in self.observable_node_ids:
+            value = 0
+            if df is None or not isinstance(df, pd.DataFrame):
+                value = 0
+            else:
+                df2 = df[df["TOPO.dst"]==id]
+                value = df2.shape[0]
+            results.append({
+                "metric": inspect.currentframe().f_code.co_name,
+                "node_id": id,
+                "value": value
+                })
+        
+        return results
+
     def net_buffer_size(self, df):
  
         """
@@ -396,6 +424,12 @@ class ManagementAgent:
              }
         
         return ret
+
+    def node_energy_consumption(self):
+
+        watt = self.sim.topology.get_info()[0]["WATT"]
+        
+        print(1)
 
     def collect_metrics(self, duration_previous_cycle):
         # metrics = {
@@ -437,10 +471,19 @@ class ManagementAgent:
        
         # Computation of actual metrics delivered to the agent
         service_node_utilization_ret = self.service_node_utilization(app_filtered_df, duration_previous_cycle)
-        agent_node_utilization = self.agent_node_utilization(agent_filtered_df, duration_previous_cycle)
-        net_buffer_size = self.net_buffer_size(net_filtered_df)
-        node_service_requests_in = self.node_service_requests_in(app_filtered_df)
-        
+        agent_node_utilization_ret = self.agent_node_utilization(agent_filtered_df, duration_previous_cycle)
+        net_buffer_size_ret = self.net_buffer_size(net_filtered_df)
+        node_requests_waiting_in_ret = self.node_requests_waiting_in(app_filtered_df)
+        node_requests_out_ret = self.node_requests_out(app_filtered_df)
+
+        self.node_energy_consumption()
+
+        print(1,service_node_utilization_ret)
+        print(2,agent_node_utilization_ret)# Note: BTB I leave individual link latency metric and control for the next version 
+        #       "net_buffer_size" is an overall net view of net saturation
+
+
+        #  
         # for node in range(len(self.N)):
         #     if "utilization" in self.N[self.node_id][node][0]:
         #         metrics["node_utilization"][node] = self.sim.topology.G.nodes[node].get("utilization", 0)

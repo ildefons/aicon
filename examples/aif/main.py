@@ -12,7 +12,7 @@ import time
 import numpy as np
 
 from yafs.core import Sim
-from yafs.application import Application,Message
+from yafs.application import Application,Message,LinearQoS
 
 from yafs.population import *
 from yafs.topology import Topology
@@ -188,7 +188,8 @@ def create_application():
     """
     Messages among MODULES (AppEdge in iFogSim)
     """
-    m_a = Message("M.A", "Camera", "ServiceA", instructions=20*10**6, bytes=1000)
+    
+    m_a = Message("M.A", "Camera", "ServiceA", instructions=20*10**6, bytes=1000, qos=LinearQoS(L=0.5,R=1.0))   #ILDE: I have added new attribute qos so I can monitor and control the QoS of this message
     m_b = Message("M.B", "ServiceA", "Dashboard", instructions=30*10**6, bytes=500)
 
     """
@@ -305,7 +306,7 @@ def main(simulated_time):
 
     stop_time = simulated_time
     sim = Sim(t, default_results_path=folder_results+"sim_trace")
-    #sim.deploy_app2(app, placement, pop, selectorPath)
+    #sim.deploy_app2(app, placement, pop, selectorself.sim.topology.get_info()[0]["WATT"]Path)
    
 
     #ILDE: declaration of my management network
@@ -406,6 +407,6 @@ if __name__ == '__main__':
     logging.config.fileConfig(os.getcwd()+'/logging.ini')
 
     start_time = time.time()
-    main(simulated_time=1500)
+    main(simulated_time=2500)
 
     print("\n--- %s seconds ---" % (time.time() - start_time))
