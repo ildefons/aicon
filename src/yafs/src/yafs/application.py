@@ -1,23 +1,19 @@
 # -*- coding: utf-8 -*-
 import random
 
+import math
+
 # ILDE: QoS related code
 class LinearQoS:
-    def __init__(self, L: float, R: float, R_inst: float = None): # R_inst is the number of instructions corresponding to R
+    def __init__(self, L: float, R: float): # R_inst is the number of instructions corresponding to R
                                                                   # L, R: in [0,1]
         if L >= R:
             raise ValueError("L must be strictly less than R.")
         self.L = L
         self.R = R
-        self.R_inst = R_inst
 
         # define the clamped linear function
-        def linear_clamped(x):
-            if self.R_inst is None:
-                raise ValueError("R_inst must be defined to the minimum number of instructions to get maximum QoS")
-            
-            x = x/self.R_inst # normalize
-            
+        def linear_clamped(x):  # Input x: is in [0,1] where 0 is o% of nominal instructions, and 1 is 100% of nominal instructions 
             if x <= self.L:
                 return 0.0
             elif x >= self.R:
@@ -29,6 +25,55 @@ class LinearQoS:
 
     def __call__(self, x: float) -> float:
         """Optionally make QoS callable directly"""
+        return self.f(x)
+    
+
+class SaturatingExpQoS:
+    def __init__(self, Q_max: float, a: float):
+        """
+        Saturating exponential QoS model (CPU-only):
+            Q(x) = Q_max * (1 - exp(-a * x))
+
+        Args:
+            Q_max (float): Maximum achievable QoS (e.g., 100.0).
+            a (float): Sensitivity parameter (must be positive).
+
+        Notes:
+            a must be strictly positive
+            Small a: very slow growth.
+            Needs a lot of CPU before QoS approaches its maximum.
+            Large a: very fast growth.
+            Even a small amount of CPU quickly yields near-max QoS.
+
+        How to compute a:
+            If my service/message takes by default 1000 instructions to execute "fully" (Qmax)
+            and I want QoS(500) = 0.5*Qmax
+            a = ln(2)/500
+            , with this a, QoS(1000) = 75
+
+            If my service/message takes by default 1000 instructions to execute "fully" (Qmax)
+            and I want QoS(100) = 0.8*Qmax
+            a = ln(5)/100 = 0.01609438
+            , with this a, QoS(1000) = 99.999999999
+
+        """
+        if Q_max <= 0:
+            raise ValueError("Q_max must be positive.")
+        if a <= 0:
+            raise ValueError("Parameter a must be positive.")
+
+        self.Q_max = Q_max
+        self.a = a
+
+        def f(x: float) -> float:  # Input x: is in [0,1] where 0 is o% of nominal instructions, and 1 is 100% of nominal instructions 
+            if x < 0:
+                raise ValueError("CPU quota x must be nonnegative.")
+            return self.Q_max * (1.0 - math.exp(-self.a * x))
+
+        self.f = f
+
+    def __call__(self, x: float) -> float:
+        """Evaluate QoS at given CPU quota x."""
         return self.f(x)
     
 #ILDE: Other QoS could be more appropiate depending of the algorithm being modelled:
@@ -98,11 +143,7 @@ class Message:
         self.original_DES_src = None #This attribute identifies the user when multiple users are in the same node
 
         #ILDE: QoS related code
-        self.qos = None
-        if qos is not None:
-            self.qos = qos
-            self.qos.R_inst = instructions  #ILDE: I am assuming message.instructions is the min number of instructions to get 100% QoS 
-
+        self.qos = qos            
 
     def __str__(self):
         print  ("{--")

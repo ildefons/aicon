@@ -160,6 +160,15 @@ class Sim:
 
         """
 
+        
+        self.des_pct_instructions = {}
+        """
+        ILDE: it keeps the actionable relationship between percentance of service instructions to be executed
+              if the DES project is related to a message with qos method providedd by the user, then 
+              this percentage of instructions will be used instead and the QoS will be updated and reported as a metric
+        """
+
+
         self.selector_path = {}
         # Store for each app.name the selection policy
         # app.name -> Selector
@@ -416,9 +425,15 @@ class Sim:
             """
             It computes the service time in processing a message and record this event
             """
-            metric_qos = None
+            pct_instructions_tobeused = 1.0  #ILDE: his value is modified by the the corresponding DES process internal variable that can be intervened
+            metric_qos = 1.0
+            
             if message.qos is not None: # ILDE: meaning the user explicitly created a QoS object when constructed the first message object 
-                metric_qos = message.qos(message.inst)
+                #ILDE: we need to read pct_instructions_tobeused from the corresponding DES process 
+                pct_instructions_tobeused = self.des_pct_instructions[des]
+                metric_qos = message.qos(pct_instructions_tobeused) # ILDE message.inst
+            
+            message_instructions_after_qos_adjustment = int(message.inst * metric_qos)
 
             if module in self.apps[app].get_sink_modules():
                 """
@@ -440,7 +455,8 @@ class Sim:
                 if position != -1:
                     my_agent_json = (self.management_network['management_network']['management_network'].agent_configs_json[position])
                     available_ipt = (1-my_agent_json["agent_ipt_percentage"]) * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
-                time_service = message.inst / available_ipt
+                #ILDE time_service = message.inst / available_ipt
+                time_service = message_instructions_after_qos_adjustment / available_ipt
 
             else:
                 """
@@ -448,7 +464,7 @@ class Sim:
                 """
                 id_node = self.alloc_DES[des]
 
-                # att_node = self.topology.get_nodes_att()[id_node] # WARNING DEPRECATED from V1.0
+                # att_node = self.topology.get_nodeupdates_att()[id_node] # WARNING DEPRECATED from V1.0
                 att_node = self.topology.G.nodes[id_node]
 
                 #ILDE
@@ -462,7 +478,8 @@ class Sim:
                 if position != -1:
                     my_agents_json = (self.management_network['management_network']['management_network'].agent_configs_json[position])
                     available_ipt = (1-my_agents_json["agent_ipt_percentage"]) * float(att_node["IPT"])  #available IPT is divided between colocated agent and app module
-                time_service = message.inst / available_ipt
+                #ILDE time_service = message.inst /update available_ipt
+                time_service = message_instructions_after_qos_adjustment / available_ipt
 
                 # ILDE
                 # print("Inside _update_node_metrics")
@@ -853,6 +870,11 @@ class Sim:
         self.env.process(self.__add_source_population(idDES, app_name, msg, distribution))
         self.alloc_DES[idDES] = id_node
         self.alloc_source[idDES] = {"id":id_node,"app":app_name,"module":msg.src,"name":msg.name}
+
+        #ILDE: every DES process has now an entry in "self.des_pct_instructions" so we can control the QoS. We index with idDES just like "self.alloc_DES"
+        self.des_pct_instructions[idDES] = 1.0 #default is 1 (= 100% of nominal mesage instructionsare executed)
+
+
         return idDES
 
 
@@ -880,6 +902,10 @@ class Sim:
         self.des_process_running[idDES] = True
         self.env.process(self.__add_source_module(idDES, app_name, module,msg, distribution))
         self.alloc_DES[idDES] = id_node
+
+        # ILDE: every DES process has now an entry in "self.des_pct_instructions" so we can control the QoS. We index with idDES just like "self.alloc_DES"
+        self.des_pct_instructions[idDES] = 1.0 #default is 1 (= 100% of nominal mesage instructionsare executed)
+
         return idDES
 
     # idsrc = sim.deploy_module(app_name, module, id_node, register_consumer_msg)
@@ -915,6 +941,9 @@ class Sim:
             self.alloc_module[app_name][module] = []
         self.alloc_module[app_name][module].append(idDES)
 
+        # ILDE: every DES process has now an entry in "self.des_pct_instructions" so we can control the QoS. We index with idDES just like "self.alloc_DES"
+        self.des_pct_instructions[idDES] = 1.0 #default is 1 (= 100% of nominal mesage instructionsare executed)
+
         return idDES
 
 
@@ -935,6 +964,10 @@ class Sim:
         idDES = self.__get_id_process()
         self.des_process_running[idDES] = True
         self.alloc_DES[idDES] = node
+
+        # ILDE: every DES process has now an entry in "self.des_pct_instructions" so we can control the QoS. We index with idDES just like "self.alloc_DES"
+        self.des_pct_instructions[idDES] = 1.0 #default is 1 (= 100% of nominal mesage instructionsare executed)
+
         self.__add_consumer_service_pipe(app_name, module, idDES)
         # Update the relathionships among module-entity
         if app_name in self.alloc_module:
