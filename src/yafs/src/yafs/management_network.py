@@ -259,7 +259,16 @@ class ManagementAgent:
 
         self.last_time_agent_start_processing = -1 # we should retrieve all agent events that happened [self.last_time_agent_start_processing, end_of_sleeping]
         self.time_of_service = 0 # time spent in previous service
+
+        #call customizable hook
+        self.__custom_init__()
+
+
  
+    def __custom_init__(self):
+        #do nothing: to be customized by user for each user new agent
+        pass
+
     def run(self):
         #Registering the DES process into the simulator
         self.sim.des_process_running[self.DES_id] = True
@@ -611,35 +620,66 @@ class ManagementAgentNetwork:
         self.logger.debug("Activiting - RUN - ManagementAgentnetwork")
 
 
-# class ExampleAgentNetwork(ManagementAgentNetwork):
-#     """
-#     This implementation of ManagementAgentNetwork locates the agents in the corresponding device id according to "agent_configs".
+class DiscreteIntervention:
 
-#     It only runs once, in the initialization.
+    def init__(self):
+        print("DiscreteIntervention to be revised maybe irrelevant")
 
-#     """
-#     def initial_allocation(self, sim, app_name):
-#         #We find the ID-nodo/resource
-#         value = {"model": "Cluster"}
-#         id_cluster = sim.topology.find_IDs(value) #there is only ONE Cluster
-#         value = {"model": "m-"}
-#         id_mobiles = sim.topology.find_IDs(value)
+    def f():
+        print(2)
 
-#         #Given an application we get its modules implemented
-#         app = sim.apps[app_name]
-#         services = app.services
+class DiscretePercentileInterventions(DiscreteIntervention):
+    def __init__(self, agent, sim, des_id, pctls):
+        """
+        Args:
+            sim: core simulator with access to intervention vector "sim.des_pct_instructions"
+            des_id. discrete event simulator process id representing the service running in node_id
+            pctls: vector of monotonically increasing percentiles (in [0,1]) representing the percentage 
+                   of the service/message instructions to be executed in each call. This value is multiplied 
+                   by the message instructions value, then the QoS function is use to recover the obtained QoS 
+                   to execute this service with the corresponding instructions  
+        """
+           
+        self.agent = agent
+        self.sim = sim
+        self.des_id = des_id
 
-#         for module in services.keys():
-#             if "Coordinator" == module:
-#                 if "Coordinator" in self.scaleServices.keys():
-#                     # print self.scaleServices["Coordinator"]
-#                     for rep in range(0,self.scaleServices["Coordinator"]):
-#                         idDES = sim.deploy_module(app_name,module,services[module],id_cluster) #Deploy as many modules as elements in the array
+        if not pctls:
+            raise ValueError("pctls list is empty")
+        for i, p in enumerate(pctls):
+            if not (0.0 <= p <= 1.0):
+                raise ValueError(f"Percentile {p} at index {i} is not in [0,1]")
+            if i > 0 and p < pctls[i-1]:
+                raise ValueError(f"Percentiles not monotonically increasing at index {i}: {p} < {pctls[i-1]}")
+        self.pctls = pctls
 
-#             elif "Calculator" == module:
-#                 if "Calculator" in self.scaleServices.keys():
-#                     for rep in range(0, self.scaleServices["Calculator"]):
-#                         idDES = sim.deploy_module(app_name,module,services[module],id_cluster)
+    def __call__(self, action_id, service_des_id):
+        """
+        applies intervention
+        Args:
+            action_id: position in list self.pctls 
+        """
+        if not isinstance(action_id, int):
+            raise TypeError(f"Parameter action_id must be int, but got {type(x).__name__}")
+        if action_id >= len(self.pctls):
+            raise ValueError(f"Parameter action_id must be less than {len(self.pctls)}, but got {action_id}")
+    
+        des_pct_instructions_old = self.sim.des_pct_instructions[service_des_id]
+        node_id = self.sim.alloc_DES[service_des_id]
 
-#             elif "Client" == module:
-#                 idDES = sim.deploy_module(app_name,module, services[module],id_mobiles)
+        # Perform intervention
+        self.sim.des_pct_instructions[service_des_id] = self.pctls[action_id]
+
+        # Perform insert intro into action event data base
+        self.sim.metrics.insert_action(
+            {"action_class_type": self.__class__.__name__,
+             "agent_class_type": self.agent.__class__.__name__, 
+             "action_id": action_id, 
+             "node_id": node_id,
+             "agent_des_id": self.des_id,
+             "service_des_id":service_des_id,
+             "time_intervention": self.sim.env.now,
+             "log": None
+             })
+
+

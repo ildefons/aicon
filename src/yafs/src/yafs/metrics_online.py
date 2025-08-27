@@ -19,10 +19,13 @@ class Metrics_online:
         self._bufferf = io.StringIO()
         self._bufferl = io.StringIO()
         self._buffera = io.StringIO()
+        self._bufferaa = io.StringIO()
+
 
         self.__ff = csv.writer(self._bufferf)
         self.__ff_link = csv.writer(self._bufferl)
         self.__ff_agent = csv.writer(self._buffera)
+        self.__ff_action = csv.writer(self._bufferaa)
 
         # Column headers
         self._event_columns = [
@@ -42,11 +45,16 @@ class Metrics_online:
             "time_sleep_start","time_sleep_end",
             "sleeping_time","time_processing_end", "service"
         ]
+        self._action_columns = [
+            "action_class_type","agent_class_type","action_id",
+            "node_id","agent_des_id","service_des_id","time_intervention","log"
+        ]
 
         # Write headers
         self.__ff.writerow(self._event_columns)
         self.__ff_link.writerow(self._link_columns)
         self.__ff_agent.writerow(self._agent_columns)
+        self.__ff_action.writerow(self._action_columns)
 
     # Insertion Methods
     def insert(self, value):
@@ -74,6 +82,13 @@ class Metrics_online:
             value["time_processing_end"], value["service"]
         ])
 
+    def insert_action(self, value):
+        self.__ff_action.writerow([
+            value["action_class_type"], value["agent_class_type"], value["action_id"],
+            value["node_id"], value["agent_des_id"], value["service_des_id"],
+            value["time_intervention"], value["log"]
+        ])
+
     # Get full CSV contents
     def get_event_csv_content(self):
         self._bufferf.seek(0)
@@ -87,7 +102,11 @@ class Metrics_online:
         self._buffera.seek(0)
         return self._buffera.read()
 
-    # Save CSV contents to file
+    def get_action_csv_content(self):
+        self._bufferaa.seek(0)
+        return self._bufferaa.read()
+
+    # Save CSV contents to file 
     def save_to_file(self, path="result"):
         with open(f"{path}.csv", "w") as f:
             f.write(self.get_event_csv_content())
@@ -95,6 +114,8 @@ class Metrics_online:
             f.write(self.get_link_csv_content())
         with open(f"{path}_agent.csv", "w") as f:
             f.write(self.get_agent_csv_content())
+        with open(f"{path}_action.csv", "w") as f:
+            f.write(self.get_action_csv_content())
 
     # Get last N rows from a buffer
     def _get_last_n_rows(self, buffer, n):
@@ -148,6 +169,11 @@ class Metrics_online:
                 df = pd.read_csv(mybuffer)
                 df_filtered = df[pd.to_numeric(df["ctime"], errors="coerce") >= min_time]
                 return df_filtered.head(max_rows)
+            elif metric_type == "action":
+                mybuffer = self._bufferaa
+                mybuffer.seek(0)
+                df = pd.read_csv(mybuffer)
+                df_filtered = df[pd.to_numeric(df["time_intervention"], errors="coerce") >= min_time]
             else: 
                 raise Exception("Unknown metric type:", metric_type)
         except Exception as e:
@@ -160,11 +186,13 @@ class Metrics_online:
         self._bufferf.flush()
         self._bufferl.flush()
         self._buffera.flush()
+        self._bufferaa.flush()
 
     def close(self):
         self._bufferf.close()
         self._bufferl.close()
         self._buffera.close()
+        self._bufferaa.close()
 
     #ILDE
     def save_to_files(self):
@@ -182,3 +210,6 @@ class Metrics_online:
 
         with open(f"{self.default_results_path}_agent.csv", "w", newline='') as filea:
             filea.write(self._buffera.getvalue())
+
+        with open(f"{self.default_results_path}_action.csv", "w", newline='') as filea:
+            filea.write(self._bufferaa.getvalue())

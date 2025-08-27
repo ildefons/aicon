@@ -25,17 +25,41 @@ from yafs.placement import Placement
 from yafs.selection import Selection
 
 # ILDE: added as part of the new agent management network 
-from yafs.management_network import ManagementAgent, ManagementAgentNetwork
+from yafs.management_network import ManagementAgent, ManagementAgentNetwork, DiscretePercentileInterventions
 import simpy
 import numpy as np
 
 
 # Custom agent classes
 class CloudAgent(ManagementAgent):
+    def __custom_init__(self):
+        self.myactions = DiscretePercentileInterventions(agent = self, 
+                                                    sim = self.sim, 
+                                                    des_id = self.DES_id, 
+                                                    pctls = [0.1, 0.3, 0.5, 0.7, 1.0])
+        self.action_id = 0
+
+
     def get_management_actions(self, app_metrics_df, agent_metrics_df):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
         #print("CloudAgent.get_management_action()")
+
+        #get the des_id of the service running in the same node of the agent
+        def get_key_by_value(d, x):
+            for k, v in d.items():
+                if v == x:
+                    return k
+            raise ValueError(f"Value {x} not found in dictionary")
+        service_des_id = get_key_by_value(self.sim.alloc_DES, self.node_id)
+        
+        #apply action to service with id = service_des_id
+        self.myactions(self.action_id, service_des_id = service_des_id)
+        #rotate action for next time
+        self.action_id = self.action_id + 1
+        if self.action_id >= len(self.myactions.pctls):
+            self.action_id = 0
+        
 
         actions = []
         # incoming_messages = [
@@ -407,6 +431,6 @@ if __name__ == '__main__':
     logging.config.fileConfig(os.getcwd()+'/logging.ini')
 
     start_time = time.time()
-    main(simulated_time=2500)
+    main(simulated_time=15500)
 
     print("\n--- %s seconds ---" % (time.time() - start_time))
