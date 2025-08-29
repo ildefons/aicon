@@ -40,7 +40,7 @@ class CloudAgent(ManagementAgent):
         self.action_id = 0
 
 
-    def get_management_actions(self, app_metrics_df, agent_metrics_df):
+    def agent_behavior(self, collected_metrics):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
         #print("CloudAgent.get_management_action()")
@@ -72,7 +72,7 @@ class CloudAgent(ManagementAgent):
         return actions
 
 class SensorAgent(ManagementAgent):
-    def get_management_actions(self, app_metrics_df, agent_metrics_df):
+    def agent_behavior(self, collected_metrics):
         """Sensor monitors metrics (no actions for now)."""
 
         #print("SensorAgent.get_management_action()")
@@ -80,7 +80,7 @@ class SensorAgent(ManagementAgent):
         return []  # Extensible for future logic
 
 class ActuatorAgent(ManagementAgent):
-    def get_management_actions(self, app_metrics_df, agent_metrics_df):
+    def agent_behavior(self, collected_metrics):
         """Actuator monitors metrics (no actions for now)."""
 
         #print("ActuatorAgent.get_management_action()")

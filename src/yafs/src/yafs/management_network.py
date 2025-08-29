@@ -269,6 +269,7 @@ class ManagementAgent:
         #do nothing: to be customized by user for each user new agent
         pass
 
+
     def run(self):
         #Registering the DES process into the simulator
         self.sim.des_process_running[self.DES_id] = True
@@ -287,10 +288,9 @@ class ManagementAgent:
             #Real logic of the management agent
             duration_previous_cycle = self.sleep_time + self.time_of_service
             #print("------------------>duration_previous_cycle:",duration_previous_cycle)
-            app_metrics_df, agent_metrics_df = self.collect_metrics(duration_previous_cycle) # we pass the time spent in previous cycle so it can compute the metrics
+            collected_metrics = self.collect_metrics(duration_previous_cycle) # we pass the time spent in previous cycle so it can compute the metrics
             self.last_time_agent_start_processing = time_sleep_end # update for next iteration
-            actions = self.get_management_actions(app_metrics_df, agent_metrics_df)   # main method to be customized
-            self.apply_actions(actions)
+            self.agent_behavior(collected_metrics)   # main method to be customized
 
             #Compute time working as self.instructions_per_wakeup/float(node["IPT"])  
             att_node = self.sim.topology.G.nodes[self.node_id]
@@ -339,6 +339,7 @@ class ManagementAgent:
 
         return results
 
+
     def service_node_utilization(self, df, duration_previous_cycle):
         
         """
@@ -353,8 +354,7 @@ class ManagementAgent:
             else:
                 value = df[df["DES.dst"]==id].service.sum()*100/duration_previous_cycle
                 value = min(value,100) # in some cases, the "update_metrics function" adds the entry into the DB and still didnt do the last "yield self.env.timeout(service_time)". This needs to be fixed but in the meantime I do this flooring
-                if value > 100:
-                    print(1)
+ 
             results.append({
                 "metric": inspect.currentframe().f_code.co_name,
                 "node_id": id,
@@ -363,6 +363,38 @@ class ManagementAgent:
 
         return results
 
+
+    def node_average_waiting_time(self, df, duration_previous_cycle):
+        """
+        Return the average waiting time for an input message/request to start being served
+
+        Reminder of relvant data fiels in message event log:
+            time_in: time message started being processed by module
+            time_out: time message ended being processed by module
+            time_emit: time message started to travel the input communication link (opinion from stat code) 
+            time_reception: time message enters in module instance queue (same as time_in if queue empty)
+        """
+        results = []
+        for id in self.observable_node_ids:
+            value = 0.0
+            if df is None or not isinstance(df, pd.DataFrame):
+                value = 0.0
+            else:
+                if df[df["DES.dst"]==id].shape[0] == 0:
+                    value = 0
+                else:                
+                    mean_time_reception = df[df["DES.dst"]==id].time_reception.mean()
+                    mean_time_in = df[df["DES.dst"]==id].time_in.mean()
+                    value = float(mean_time_in - mean_time_reception)
+            results.append({
+                "metric": inspect.currentframe().f_code.co_name,
+                "node_id": id,
+                "value": value
+            })
+            
+        return results
+        
+        
     def node_requests_waiting_in(self, df):
 
         """
@@ -391,6 +423,7 @@ class ManagementAgent:
         
         return results
   
+
     def node_requests_out(self, df):
 
         """
@@ -416,6 +449,7 @@ class ManagementAgent:
         
         return results
 
+
     def net_buffer_size(self, df):
  
         """
@@ -434,11 +468,32 @@ class ManagementAgent:
         
         return ret
 
-    def node_energy_consumption(self):
+
+    def node_nominal_watt(self):
 
         watt = self.sim.topology.get_info()[0]["WATT"]
+
+
+    def merge_json_objects(self, *args):
+        """
+        Merge multiple lists of JSON objects and individual JSON objects into one list.
         
-        print(1)
+        Args:
+            *args: Arbitrary number of lists of dicts or individual dicts.
+        
+        Returns:
+            list: A single flattened list of JSON objects.
+        """
+        result = []
+        for arg in args:
+            if isinstance(arg, list):  # if it's a list, extend
+                result.extend(arg)
+            elif isinstance(arg, dict):  # if it's a dict, append
+                result.append(arg)
+            else:
+                raise TypeError(f"Unsupported type {type(arg)}. Expected dict or list of dicts.")
+        return result
+
 
     def collect_metrics(self, duration_previous_cycle):
         # metrics = {
@@ -484,13 +539,22 @@ class ManagementAgent:
         net_buffer_size_ret = self.net_buffer_size(net_filtered_df)
         node_requests_waiting_in_ret = self.node_requests_waiting_in(app_filtered_df)
         node_requests_out_ret = self.node_requests_out(app_filtered_df)
+        node_average_waiting_time_ret = self.node_average_waiting_time(app_filtered_df, duration_previous_cycle)
 
-        self.node_energy_consumption()
+        self.node_nominal_watt()
 
-        print(1,service_node_utilization_ret)
-        print(2,agent_node_utilization_ret)# Note: BTB I leave individual link latency metric and control for the next version 
+        #print(1,service_node_utilization_ret)
+        #print(2,agent_node_utilization_ret)# Note: BTB I leave individual link latency metric and control for the next version 
         #       "net_buffer_size" is an overall net view of net saturation
 
+
+        # Consolidate metric json objects into a single list of json objects
+        collected_metrics = self.merge_json_objects(service_node_utilization_ret,
+                                                    agent_node_utilization_ret,
+                                                    net_buffer_size_ret,
+                                                    node_requests_waiting_in_ret,
+                                                    node_requests_out_ret,
+                                                    node_average_waiting_time_ret) 
 
         #  
         # for node in range(len(self.N)):
@@ -515,28 +579,30 @@ class ManagementAgent:
         #             entry["execution_time"] for entry in self.sim.metrics.data
         #             if entry["node"] == node and entry["message"] == "AgentExecution"
         #         )
-        return app_filtered_df, agent_filtered_df
+        return collected_metrics #app_filtered_df, agent_filtered_df
     
-    def get_management_actions(self, app_metrics_df, agent_metrics_df):
+
+    def agent_behavior(self, collected_metric):
         return []
 
-    def apply_actions(self, actions):
+
+    # def apply_actions(self, actions):
         
-        for action in actions:
-            action_type = action[0]
-            if action_type == "set_message_instructions":
-                _, app_name, msg_name, node, new_instructions = action
-                if "message_instructions" in self.N[self.node_id][node][1]:
-                    if app_name in self.sim.apps and msg_name in self.sim.apps[app_name].messages:
-                        if new_instructions >= 10000000:  # Minimum instructions
-                            self.sim.apps[app_name].messages[msg_name]["instructions"] = new_instructions
-                            self.logger.info(f"Applied: Set {msg_name} instructions to {new_instructions} for node {node} in app {app_name}")
-                        else:
-                            self.logger.error(f"Invalid instructions {new_instructions} for {msg_name}")
-                    else:
-                        self.logger.error(f"Invalid app {app_name} or message {msg_name}")
-            else:
-                self.logger.error(f"Unsupported action type: {action_type}")
+    #     for action in actions:
+    #         action_type = action[0]
+    #         if action_type == "set_message_instructions":
+    #             _, app_name, msg_name, node, new_instructions = action
+    #             if "message_instructions" in self.N[self.node_id][node][1]:
+    #                 if app_name in self.sim.apps and msg_name in self.sim.apps[app_name].messages:
+    #                     if new_instructions >= 10000000:  # Minimum instructions
+    #                         self.sim.apps[app_name].messages[msg_name]["instructions"] = new_instructions
+    #                         self.logger.info(f"Applied: Set {msg_name} instructions to {new_instructions} for node {node} in app {app_name}")
+    #                     else:
+    #                         self.logger.error(f"Invalid instructions {new_instructions} for {msg_name}")
+    #                 else:
+    #                     self.logger.error(f"Invalid app {app_name} or message {msg_name}")
+    #         else:
+    #             self.logger.error(f"Unsupported action type: {action_type}")
 
 
 class ManagementAgentNetwork:
