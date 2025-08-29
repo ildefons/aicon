@@ -1,9 +1,11 @@
 # Development agenda
 
-- Add metrics:
-    - Average time to start being served
+(*) focuss points
 
-- Add cost model (not yet used in lab papers)
+- Add metrics:
+    - (*)Average time to start being served
+
+- (*) Add cost model (not yet used in lab papers)
     - do research on cost models that can be simulaed (model has to be "citable")
     - take a look initial surveys:
         - https://x.com/i/grok/share/3czCDcxYWqGep9Uxf8Kpm8NFt
@@ -19,12 +21,12 @@
         - Agent can make interventions into the "message forwarding probability vector" to simulate "onloading"
         - Note: this mechanism is interesting to explore decentralized algorithms for resource optimization.
 
-- Actions for deploy/undeploy services on observable nodes (e.g. used in streaming application). 
+- (*) Actions for deploy/undeploy services on observable nodes (e.g. used in streaming application). 
     - It can serve as alternative to "redirecting incoming messages" if the central routing algorithm can redirect messages to nodes with lower demand.
 
-- Consolidate json metrics objects into a single json metric object and make "collect_metrics" to return it  
+- (*) Consolidate json metrics objects into a single json metric object and make "collect_metrics" to return it  
 
-- Consolidate ManagementAgent run method: cosider merging get_management_actions and apply_actions into 1 method
+- (*) Consolidate ManagementAgent run method: cosider merging get_management_actions and apply_actions into 1 method
 
 - How can I make metric collection more efficient:
     - Problem: agents wake up at different rates so is hard to simply colllect once for all
