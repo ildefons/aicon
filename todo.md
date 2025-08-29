@@ -10,6 +10,11 @@
 - Actions for deploy/undeploy services on observable nodes (e.g. used in streaming application)
 
 - Actions for redirecting incoming messages to other instances of the same service (e.g. used in onloading electric vehicles)
+    - Possibility: 
+        - Agents look for same process instances in nodes from observability list
+        - Agents keep "message forwarding probability vector" that defines where to foward incoming messages (can be keeping it for processing itself)
+        - Update message destination accordingly and push message again to the "network_ctrl_pipe" (if different from itself)
+        - Agent can make interventions into the "message forwarding probability vector" to simulate "onloading"
 
 - Consolidate json metrics objects into a single json metric object and make "collect_metrics" to return it  
 
