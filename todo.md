@@ -23,6 +23,9 @@
 
 - (*) Actions for deploy/undeploy services on observable nodes (e.g. used in streaming application). 
     - It can serve as alternative to "redirecting incoming messages" if the central routing algorithm can redirect messages to nodes with lower demand.
+    - What happens when we deploy an application module in a node without agent? is it possible to have nodes without agents (event allways sleeping agents)?
+    - What happends if we try to deploy an agent? how would it work (replicate itself, deploy an agent from a library of agents, something else)?
+    - How would this type of interventions could enable the creation of infrastructure that tries to survive no matter what is the disruption?
 
 - (*, done) Consolidate json metrics objects into a single json metric object and make "collect_metrics" to return it  
 
@@ -35,3 +38,14 @@
 - Elaborated examples:
     - Simple examples for custom agents: read metrics, do interventions, define observability set, define QoS class, and so on
     - Depending of implemented interventions: EV case, stream app, federated learning 
+
+
+# New tasks 1/9/2025:
+
+- (*) Convert collected metrics to discrete state space comptible with pymdp
+    - (<---IMHERE) Consider creating a class for each possible metric and pass the list of metrics to the agent as a list at declaration time
+    - What to do with the postprocessing of the metrics (normalization, discretization, ctaegorization, cleaning,....)?
+        - BTB up to the custom "agent.agent_behavior()"?
+    - Do a similar list for intervention classes  
+
+- (*, done) Find citations for the QoS models "LinearQoS", "SaturatingExpQoS"

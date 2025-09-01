@@ -36,7 +36,15 @@ class SaturatingExpQoS:
 
         Args:
             Q_max (float): Maximum achievable QoS (e.g., 100.0).
-            a (float): Sensitivity parameter (must be positive).
+            a (float): Sensitivity parameter (must be positiv
+            - If beta=0 → only saturation (no decline).
+            - If beta>0 → possible decline at high x.
+
+        Example:
+            Q_max = 100
+            alpha = 0.02
+            beta = 0.001
+            R_inst = 1000e).
 
         Notes:
             a must be strictly positive
@@ -69,13 +77,79 @@ class SaturatingExpQoS:
             if x < 0:
                 raise ValueError("CPU quota x must be nonnegative.")
             return self.Q_max * (1.0 - math.exp(-self.a * x))
+        
+        def __call__(self, x: float) -> float:
+            """Optionally make QoS callable directly"""
+            return self.f(x)
+
+class USLQoS:
+    def __init__(self, Q_max: float, alpha: float, beta: float, R_inst: float):
+        """
+        Universal Scalability Law (USL) QoS model with normalized input:
+            Q(x) = Q_max * [ N / (1 + alpha*(N-1) + beta*N*(N-1)) ]
+
+        Citations:
+            1)chatgpt discussion: https://chatgpt.com/share/68b55c9e-42c8-8013-8106-e008ab350f23
+            
+            2)Khan, Hassan Mahmood, Fang-Fang Chua, and Timothy Tzen Vun Yap. 
+            "ReSQoV: a scalable resource allocation model for qos-satisfied cloud services." 
+            Future Internet 14.5 (2022): 131.
+
+        Args:
+            Q_max (float): Maximum achievable QoS (normalization factor).
+            alpha (float): Contention coefficient (>= 0).
+            beta (float): Coherency coefficient (>= 0).
+            R_inst (float): Nominal number of instructions required for full QoS.
+                            This sets the scale for normalization.
+
+        Notes:
+            - Input x must be in [0,1], representing the fraction of R_inst.
+              Example: x=0.5 means half the nominal instructions.
+            - Internally, we map x → N = 1 + (x * (R_inst - 1)).
+              So at x=0 → N=1 (minimum unit).
+              At x=1 → N=R_inst (full resources).
+            - If beta=0 → only saturation (no decline).
+            - If beta>0 → possible decline at high x.
+
+        Example:
+            Q_max = 100
+            alpha = 0.02
+            beta = 0.001
+            R_inst = 1000
+
+            model = USLQoS(Q_max, alpha, beta, R_inst)
+            qos_half = model(0.5)   # QoS at 50% of nominal instructions
+        """
+        if Q_max <= 0:
+            raise ValueError("Q_max must be positive.")
+        if alpha < 0 or beta < 0:
+            raise ValueError("alpha and beta must be nonnegative.")
+        if R_inst <= 1:
+            raise ValueError("R_inst must be > 1.")
+
+        self.Q_max = Q_max
+        self.alpha = alpha
+        self.beta = beta
+        self.R_inst = R_inst
+
+        def f(x: float) -> float:
+            if not (0 <= x <= 1):
+                raise ValueError("x must be in [0,1].")
+            # Map normalized x to equivalent 'processors' N
+            N = 1 + x * (self.R_inst - 1)  #Note: it scales in [1,Rinst] instead of [0,Rinst]
+            # N = x * self.R_inst #Note: it scales in [0,Rinst] but not good
+            # Reason: https://x.com/i/grok/share/6giqTLUc9Mlfeq51bopPKmdUM
+            # Reason. it prevents unwanted behavior at N = 0 (where N = x*R_inst)
+            
+            denom = 1.0 + self.alpha * (N - 1) + self.beta * N * (N - 1)
+            return self.Q_max * (N / denom)
 
         self.f = f
 
     def __call__(self, x: float) -> float:
-        """Evaluate QoS at given CPU quota x."""
         return self.f(x)
     
+
 #ILDE: Other QoS could be more appropiate depending of the algorithm being modelled:
 # For many modern algorithms, the relationship is highly non-linear. Here are common cases where the linear model fails:
 

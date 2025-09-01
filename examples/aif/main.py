@@ -348,21 +348,45 @@ def main(simulated_time):
           "sleep_time": 500,  
           "instructions_per_wakeup": 5*10*10**8,
           "agent_ipt_percentage": 0.5,
-          "observable_node_ids": [0,1]
+          "observable_node_ids": [0,1],
+          "metrics": {"service_node_utilization": "ServiceNodeUtilization",
+                      "agent_node_utilization": "AgentNodeUtilization",
+                      "node_average_waiting_time": "NodeAverageWaitingTime",
+                      "node_request_waiting_in": "NodeRequestsWaitingIn",
+                      "node_requests_out": "NodeRequestsOut",
+                      "net_buffer_size": "NetBufferSize",
+                      "node_nominalwatt": "NodeNominalWatt"
+                     }
          },
          {"node_id": 1,
           "agent_type": SensorAgent,
           "sleep_time": 500,  
           "instructions_per_wakeup": 10**8,
           "agent_ipt_percentage": 0.5,
-          "observable_node_ids": [1,2]
+          "observable_node_ids": [1,2],
+          "metrics": {"service_node_utilization": "ServiceNodeUtilization",
+                      "agent_node_utilization": "AgentNodeUtilization",
+                      "node_average_waiting_time": "NodeAverageWaitingTime",
+                      "node_request_waiting_in": "NodeRequestsWaitingIn",
+                      "node_requests_out": "NodeRequestsOut",
+                      "net_buffer_size": "NetBufferSize",
+                      "node_nominalwatt": "NodeNominalWatt"
+                     }
          },
          {"node_id": 2,
           "agent_type": ActuatorAgent,
           "sleep_time": 500,  
           "instructions_per_wakeup": 10*10*10**6,
           "agent_ipt_percentage": 0.5,
-          "observable_node_ids": [2,0]
+          "observable_node_ids": [2,0],
+          "metrics": {"service_node_utilization": "ServiceNodeUtilization",
+                      "agent_node_utilization": "AgentNodeUtilization",
+                      "node_average_waiting_time": "NodeAverageWaitingTime",
+                      "node_request_waiting_in": "NodeRequestsWaitingIn",
+                      "node_requests_out": "NodeRequestsOut",
+                      "net_buffer_size": "NetBufferSize",
+                      "node_nominalwatt": "NodeNominalWatt"
+                     }
          }
     ]
 
