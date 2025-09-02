@@ -2,16 +2,21 @@
 
 (*) focuss points
 
-- Add metrics:
-    - (*, done) Average time to start being served
+- (*, done) Mtric: average time to start being served
 
-- (*) Add cost model (not yet used in lab papers)
+- (*, done) Add cost model (not yet used in lab papers)
     - do research on cost models that can be simulaed (model has to be "citable")
     - take a look initial surveys:
         - https://x.com/i/grok/share/3czCDcxYWqGep9Uxf8Kpm8NFt
         - https://chatgpt.com/share/68b057c0-de04-8013-b8dd-5011dd7bd3f2
     - it makes node "IPT" and message "instructions" actionable variables
-    - It may integrate both device usage and energy consumption into an integrated or seprated metrics
+    -  (No) It may integrate both device usage and energy consumption into an integrated or seprated metrics
+
+- (*) Action to modify node IPT
+
+- (*) Action to modify node agent_ipt_percentage
+
+- (*) Revisit Action DiscretePercentileInterventions
 
 - Actions for redirecting incoming messages to other instances of the same service (e.g. used in onloading electric vehicles)
     - Possibility: 
@@ -43,9 +48,13 @@
 # New tasks 1/9/2025:
 
 - (*) Convert collected metrics to discrete state space comptible with pymdp
-    - (<---IMHERE) Consider creating a class for each possible metric and pass the list of metrics to the agent as a list at declaration time
+    - (*, done) Consider creating a class for each possible metric and pass the list of metrics to the agent as a list at declaration time
+        - class module should be specified in the agent configuration json object (now all in management_network module)
     - What to do with the postprocessing of the metrics (normalization, discretization, ctaegorization, cleaning,....)?
         - BTB up to the custom "agent.agent_behavior()"?
-    - Do a similar list for intervention classes  
+
+- (*) Do list for intervention classes in the agant declaration json object (jus like metrics)  
 
 - (*, done) Find citations for the QoS models "LinearQoS", "SaturatingExpQoS"
+
+- (*) clean old metrics methods

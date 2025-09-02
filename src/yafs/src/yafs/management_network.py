@@ -15,7 +15,8 @@ class ManagementAgent:
                  instructions_per_wakeup, 
                  agent_ipt_percentage,
                  observable_node_ids,
-                 metrics_json):
+                 metrics_json,
+                 cost_alpha):
         self.sim = sim
         self.node_id = node_id  # Node where agent is colocated
         self.DES_id = DES_id # Id of the DES process for this agent 
@@ -36,12 +37,22 @@ class ManagementAgent:
         self.agent_filtered_df = None
         self.net_filtered_df = None
 
+        self.cost_alpha = cost_alpha
+
         self.metrics = {}
         for key, value in metrics_json.items():
-            import importlib
-            module = importlib.import_module("yafs.management_network")
-            cls = getattr(module, value)
-            self.metrics[key] = cls(self)
+            try :
+                import importlib
+                module_name = "yafs.management_network"
+                module = importlib.import_module(module_name) #make it customizable 
+                cls = getattr(module, value)
+                self.metrics[key] = cls(self)
+            except ImportError as e:
+                print("Failed to import module " + module_name +": " + e.msg)
+            except AttributeError as e:
+                print(f"Class '{value}' not found in module: {e}")
+            except Exception as e:
+                print(f"An unexpected error occurred for key '{key}': {e}")
 
         #call customizable hook
         self.__custom_init__()
@@ -100,209 +111,40 @@ class ManagementAgent:
         #self.logger.debug("STOP_Process - Placement Algorithm\t#DES:%i" % self.DES_id)
         
 
-    # custom metrics
-    def agent_node_utilization(self):#, df,  duration_previous_cycle):
-            
+    def append_to_json_list(self, existing_list, new_item):
         """
-        Returns the service utilization (%) for a list of a observable nodes
-
-        args: agent_filtered_df, duration_previous_cycle
-        """
-
-        df = self.agent_filtered_df
-        duration_previous_cycle = self.duration_previous_cycle
-
-        results = []
-        for id in self.observable_node_ids:
-            value = 0.0
-            if df is None or not isinstance(df, pd.DataFrame):
-                value = 0.0
-            else:
-                value = df[df.node_id==id].service.sum()*100/duration_previous_cycle
-            results.append({
-                "metric": inspect.currentframe().f_code.co_name,
-                "node_id": id,
-                "value": value
-            })
-
-        return results
-
-
-    def service_node_utilization(self):#, df, duration_previous_cycle):
-        
-        """
-        Returns the service utilization (%) for a list of a observable nodes
-
-        args: app_filtered_df, duration_previous_cycle
-        """
-
-        df = self.app_filtered_df
-        duration_previous_cycle = self.duration_previous_cycle
-
-        results = []
-        for id in self.observable_node_ids:
-            value = 0.0
-            if df is None or not isinstance(df, pd.DataFrame):
-                value = 0.0
-            else:
-                value = df[df["DES.dst"]==id].service.sum()*100/duration_previous_cycle
-                value = min(value,100) # in some cases, the "update_metrics function" adds the entry into the DB and still didnt do the last "yield self.env.timeout(service_time)". This needs to be fixed but in the meantime I do this flooring
- 
-            results.append({
-                "metric": inspect.currentframe().f_code.co_name,
-                "node_id": id,
-                "value": value
-            })
-
-        return results
-
-
-    def node_average_waiting_time(self):#, df, duration_previous_cycle):
-        """
-        Return the average waiting time for an input message/request to start being served
-
-        Reminder of relvant data fiels in message event log:
-            time_in: time message started being processed by module
-            time_out: time message ended being processed by module
-            time_emit: time message started to travel the input communication link (opinion from stat code) 
-            time_reception: time message enters in module instance queue (same as time_in if queue empty)
-
-        args: app_filtered_df, duration_previous_cycle
-        """
-        
-        df = self.app_filtered_df
-        
-        results = []
-        for id in self.observable_node_ids:
-            value = 0.0
-            if df is None or not isinstance(df, pd.DataFrame):
-                value = 0.0
-            else:
-                if df[df["DES.dst"]==id].shape[0] == 0:
-                    value = 0
-                else:                
-                    mean_time_reception = df[df["DES.dst"]==id].time_reception.mean()
-                    mean_time_in = df[df["DES.dst"]==id].time_in.mean()
-                    value = float(mean_time_in - mean_time_reception)
-            results.append({
-                "metric": inspect.currentframe().f_code.co_name,
-                "node_id": id,
-                "value": value
-            })
-            
-        return results
-        
-        
-    def node_requests_waiting_in(self):
-
-        """
-        Returns the number of service requests waiting to be served by the node in each observable node 
-        (note: BTB only 1 app service per node, so is the same a sevice~node) 
-
-        args: app_filtered_df
-        """
-
-        df = self.app_filtered_df
-        
-        value = 0
-        results = []
-
-        for id in self.observable_node_ids:
-            value = 0.0
-            if df is None or not isinstance(df, pd.DataFrame):
-                value = 0.0
-            else:
-                df2 = df[df["TOPO.dst"]==id]
-                if df2.shape[0] > 0:
-                    value = df2.loc[df2['time_out'].idxmax(), 'in_buffer_size_des']
-                else:
-                    value = 0.0
-            results.append({
-                "metric": inspect.currentframe().f_code.co_name,
-                "node_id": id,
-                "value": value
-                })
-        
-        return results
-  
-
-    def node_requests_out(self):
-
-        """
-        Returns the number of service requests serviced by the node in each observable node since the begining of the simulation
-        (note: BTB only 1 app service per node, so is the same a sevice~node) 
-
-        args: app_filtered_df
-        """
-
-        df = self.app_filtered_df
-        
-        value = 0
-        results = []
-
-        for id in self.observable_node_ids:
-            value = 0
-            if df is None or not isinstance(df, pd.DataFrame):
-                value = 0
-            else:
-                df2 = df[df["TOPO.dst"]==id]
-                value = df2.shape[0]
-            results.append({
-                "metric": inspect.currentframe().f_code.co_name,
-                "node_id": id,
-                "value": value
-                })
-        
-        return results
-
-
-    def net_buffer_size(self):
- 
-        """
-        Returns the most current network buffer size 
-
-        args: net_filtered_df
-        """
-
-        df = self.net_filtered_df
-
-        value = 0.0
-        if df is None or not isinstance(df, pd.DataFrame):
-            value = 0.0
-        else:
-            value = df.loc[df['ctime'].idxmax(), 'buffer']
-        ret ={"metric": inspect.currentframe().f_code.co_name,
-              "node_id": self.node_id,
-              "value": value
-             }
-        
-        return ret
-
-
-    def node_nominal_watt(self):
-
-        watt = self.sim.topology.get_info()[0]["WATT"]
-
-
-    def merge_json_objects(self, *args):
-        """
-        Merge multiple lists of JSON objects and individual JSON objects into one list.
+        Appends a JSON object or a list of JSON objects to an existing list.
         
         Args:
-            *args: Arbitrary number of lists of dicts or individual dicts.
+            existing_list (list): The list to append to (may be empty or contain JSON objects).
+            new_item (dict or list): A single JSON object (dict) or a list of JSON objects.
         
         Returns:
-            list: A single flattened list of JSON objects.
+            list: The updated list with all JSON objects.
         """
-        result = []
-        for arg in args:
-            if isinstance(arg, list):  # if it's a list, extend
-                result.extend(arg)
-            elif isinstance(arg, dict):  # if it's a dict, append
-                result.append(arg)
+        try:
+            # Ensure existing_list is a list
+            if not isinstance(existing_list, list):
+                raise TypeError("existing_list must be a list")
+            
+            # If new_item is a list, extend existing_list with its items
+            if isinstance(new_item, list):
+                for item in new_item:
+                    if not isinstance(item, dict):
+                        print(f"Warning: Skipping invalid item in list, expected dict, got {type(item)}")
+                        continue
+                    existing_list.append(item)
+            # If new_item is a single JSON object (dict), append it directly
+            elif isinstance(new_item, dict):
+                existing_list.append(new_item)
             else:
-                raise TypeError(f"Unsupported type {type(arg)}. Expected dict or list of dicts.")
-        return result
+                print(f"Warning: new_item is not a dict or list, got {type(new_item)}")
+            
+            return existing_list
+        
+        except Exception as e:
+            print(f"Error appending to list: {e}")
+            return existing_list  # Return original list to avoid data loss
 
 
     def collect_metrics(self, duration_previous_cycle):
@@ -350,24 +192,13 @@ class ManagementAgent:
         self.net_filtered_df = net_filtered_df
 
         # Computation of actual metrics delivered to the agent
-        service_node_utilization_ret = self.service_node_utilization()
-        agent_node_utilization_ret = self.agent_node_utilization()
-        net_buffer_size_ret = self.net_buffer_size()
-        node_requests_waiting_in_ret = self.node_requests_waiting_in()
-        node_requests_out_ret = self.node_requests_out()
-        node_average_waiting_time_ret = self.node_average_waiting_time()
+        collected_metrics = []
+        for metric_key, metric_object in self.metrics.items():
+            new_metrics = metric_object()
+            collected_metrics = self.append_to_json_list(collected_metrics, new_metrics)
 
-        self.node_nominal_watt()
-
-
-
-        # Consolidate metric json objects into a single list of json objects
-        collected_metrics = self.merge_json_objects(service_node_utilization_ret,
-                                                    agent_node_utilization_ret,
-                                                    net_buffer_size_ret,
-                                                    node_requests_waiting_in_ret,
-                                                    node_requests_out_ret,
-                                                    node_average_waiting_time_ret) 
+        # update self.last_time_agent_start_processing s.t. = sim.now
+        # ILDE this update is done insde agent.run(): self.last_time_agent_start_processing = self.sim.env.now
 
         return collected_metrics 
     
@@ -420,13 +251,14 @@ class ManagementAgentNetwork:
             myId = self.sim._Sim__get_id_process()#__get_id_process() is private so I overcome the privatenss explicitly (not nice)
             agent_name = "agent_" + "node" + str(node_id) + "_" + agent_type.__name__
             metrics_json = agent_json["metrics"]
+            cost_alpha = agent_json["cost_alpha"]
 
             #make sure agent_ipt_percentage is within range [0,1]. If not floor it between [0,1] + log a warning
             agent_ipt_percentage_01 = max(0, min(1, agent_ipt_percentage))
 
             #observable_node_ids = agent_json["observable_node_ids"]
             agent = agent_type(self.sim, node_id, myId, agent_name, sleep_time, instructions_per_wakeup, 
-                               agent_ipt_percentage_01, observable_node_ids, metrics_json)
+                               agent_ipt_percentage_01, observable_node_ids, metrics_json, cost_alpha)
             self.agents[node_id] = agent
             # start gant process        
 
@@ -469,20 +301,21 @@ class ServiceNodeUtilization(Metric):
         Returns the service utilization (%) for a list of a observable nodes
         """
 
-        df = self.app_filtered_df
-        duration_previous_cycle = self.duration_previous_cycle
+        df = self.agent.app_filtered_df
+        duration_previous_cycle = self.agent.duration_previous_cycle
 
         results = []
-        for id in self.observable_node_ids:
+        for id in self.agent.observable_node_ids:
             value = 0.0
             if df is None or not isinstance(df, pd.DataFrame):
                 value = 0.0
             else:
+
                 value = df[df["DES.dst"]==id].service.sum()*100/duration_previous_cycle
                 value = min(value,100) # in some cases, the "update_metrics function" adds the entry into the DB and still didnt do the last "yield self.env.timeout(service_time)". This needs to be fixed but in the meantime I do this flooring
  
             results.append({
-                "metric": inspect.currentframe().f_code.co_name,
+                "metric": self.__class__.__name__,
                 "node_id": id,
                 "value": value
             })
@@ -503,18 +336,18 @@ class AgentNodeUtilization(Metric):
         args: agent_filtered_df, duration_previous_cycle
         """
 
-        df = self.agent_filtered_df
-        duration_previous_cycle = self.duration_previous_cycle
+        df = self.agent.agent_filtered_df
+        duration_previous_cycle = self.agent.duration_previous_cycle
 
         results = []
-        for id in self.observable_node_ids:
+        for id in self.agent.observable_node_ids:
             value = 0.0
             if df is None or not isinstance(df, pd.DataFrame):
                 value = 0.0
             else:
                 value = df[df.node_id==id].service.sum()*100/duration_previous_cycle
             results.append({
-                "metric": inspect.currentframe().f_code.co_name,
+                "metric": self.__class__.__name__,
                 "node_id": id,
                 "value": value
             })
@@ -539,10 +372,10 @@ class NodeAverageWaitingTime(Metric):
         args: app_filtered_df, duration_previous_cycle
         """
         
-        df = self.app_filtered_df
+        df = self.agent.app_filtered_df
         
         results = []
-        for id in self.observable_node_ids:
+        for id in self.agent.observable_node_ids:
             value = 0.0
             if df is None or not isinstance(df, pd.DataFrame):
                 value = 0.0
@@ -554,7 +387,7 @@ class NodeAverageWaitingTime(Metric):
                     mean_time_in = df[df["DES.dst"]==id].time_in.mean()
                     value = float(mean_time_in - mean_time_reception)
             results.append({
-                "metric": inspect.currentframe().f_code.co_name,
+                "metric": self.__class__.__name__,
                 "node_id": id,
                 "value": value
             })
@@ -576,12 +409,12 @@ class NodeRequestsWaitingIn(Metric):
         args: app_filtered_df
         """
 
-        df = self.app_filtered_df
+        df = self.agent.app_filtered_df
         
         value = 0
         results = []
 
-        for id in self.observable_node_ids:
+        for id in self.agent.observable_node_ids:
             value = 0.0
             if df is None or not isinstance(df, pd.DataFrame):
                 value = 0.0
@@ -592,7 +425,7 @@ class NodeRequestsWaitingIn(Metric):
                 else:
                     value = 0.0
             results.append({
-                "metric": inspect.currentframe().f_code.co_name,
+                "metric": self.__class__.__name__,
                 "node_id": id,
                 "value": value
                 })
@@ -613,12 +446,12 @@ class NodeRequestsOut(Metric):
         args: app_filtered_df
         """
 
-        df = self.app_filtered_df
+        df = self.agent.app_filtered_df
         
         value = 0
         results = []
 
-        for id in self.observable_node_ids:
+        for id in self.agent.observable_node_ids:
             value = 0
             if df is None or not isinstance(df, pd.DataFrame):
                 value = 0
@@ -626,7 +459,7 @@ class NodeRequestsOut(Metric):
                 df2 = df[df["TOPO.dst"]==id]
                 value = df2.shape[0]
             results.append({
-                "metric": inspect.currentframe().f_code.co_name,
+                "metric": self.__class__.__name__,
                 "node_id": id,
                 "value": value
                 })
@@ -646,15 +479,15 @@ class NetBufferSize(Metric):
         args: net_filtered_df
         """
 
-        df = self.net_filtered_df
+        df = self.agent.net_filtered_df
 
         value = 0.0
         if df is None or not isinstance(df, pd.DataFrame):
             value = 0.0
         else:
             value = df.loc[df['ctime'].idxmax(), 'buffer']
-        ret ={"metric": inspect.currentframe().f_code.co_name,
-              "node_id": self.node_id,
+        ret ={"metric": self.__class__.__name__,
+              "node_id": self.agent.node_id,
               "value": value
              }
         
@@ -667,8 +500,69 @@ class NodeNominalWatt(Metric):
         self.agent = agent
     
     def __call__(self):
-        watt = self.sim.topology.get_info()[0]["WATT"]
+        value = self.agent.sim.topology.get_info()[0]["WATT"]
+        ret ={"metric": self.__class__.__name__,
+              "node_id": self.agent.node_id,
+              "value": value
+             }
+        
+        return ret
 
+
+class LinearCostBuyya(Metric):
+
+    """
+    We adopt a linear cost model based on utilization rate and node performance, inspired by resource management studies in fog and cloud computing
+    Mahmud, R., Kotagiri, R., & Buyya, R. (2018). "Fog Computing: A Taxonomy, Survey and Future Directions." In Internet of Everything (pp. 103-130). Springer.
+    
+    Original model:
+    cost = alpha * Utilization * Performance
+    
+    Our variation to compute cost for a period of time T of constant utilization and performance:
+    cost_period = T * alpha * Utilization * Performance
+    """
+
+    def __init__(self, agent):
+        self.agent = agent
+    
+    def __call__(self):
+        def get_utilization(data, id):
+            return next((entry['value'] for entry in data if entry['node_id'] == id), None)
+        
+        cost_alpha = self.agent.cost_alpha
+        agent_ipt_percentage = self.agent.agent_ipt_percentage
+        instructions_per_wakeup = self.agent.instructions_per_wakeup
+        duration_previous_cycle = self.agent.duration_previous_cycle
+
+        agent_util = AgentNodeUtilization(self.agent)
+
+        service_util = ServiceNodeUtilization(self.agent)
+
+        agent_util_pct = agent_util()
+
+        service_util_pct = service_util()
+
+        results = []
+        for id in self.agent.observable_node_ids:
+            value = 0
+            agent_util_pct_id = get_utilization(agent_util_pct, id)
+            if agent_util_pct_id is None:
+                agent_util_pct_id = 0.0
+            service_util_pct_id = get_utilization(service_util_pct, id)
+            if service_util_pct_id is None:
+                service_util_pct_id = 0.0    
+            
+            value = duration_previous_cycle * \
+                    cost_alpha * \
+                    ((1-agent_ipt_percentage)*service_util_pct_id/100.0 + agent_ipt_percentage*agent_util_pct_id/100.0) * \
+                    instructions_per_wakeup
+
+            results.append({"metric": self.__class__.__name__,
+                "node_id": id,
+                "value": value
+                })
+        
+        return results
 
 # Intervention Classes
 

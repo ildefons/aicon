@@ -355,8 +355,10 @@ def main(simulated_time):
                       "node_request_waiting_in": "NodeRequestsWaitingIn",
                       "node_requests_out": "NodeRequestsOut",
                       "net_buffer_size": "NetBufferSize",
-                      "node_nominalwatt": "NodeNominalWatt"
-                     }
+                      "node_nominalwatt": "NodeNominalWatt",
+                      "linear_cost_buyya": "LinearCostBuyya"
+                     },
+          "cost_alpha": 1.0
          },
          {"node_id": 1,
           "agent_type": SensorAgent,
@@ -370,8 +372,10 @@ def main(simulated_time):
                       "node_request_waiting_in": "NodeRequestsWaitingIn",
                       "node_requests_out": "NodeRequestsOut",
                       "net_buffer_size": "NetBufferSize",
-                      "node_nominalwatt": "NodeNominalWatt"
-                     }
+                      "node_nominalwatt": "NodeNominalWatt",
+                      "linear_cost_buyya": "LinearCostBuyya"
+                     },
+          "cost_alpha": 1.0
          },
          {"node_id": 2,
           "agent_type": ActuatorAgent,
@@ -385,8 +389,10 @@ def main(simulated_time):
                       "node_request_waiting_in": "NodeRequestsWaitingIn",
                       "node_requests_out": "NodeRequestsOut",
                       "net_buffer_size": "NetBufferSize",
-                      "node_nominalwatt": "NodeNominalWatt"
-                     }
+                      "node_nominalwatt": "NodeNominalWatt",
+                      "linear_cost_buyya": "LinearCostBuyya"
+                     },
+          "cost_alpha": 1.0
          }
     ]
 
