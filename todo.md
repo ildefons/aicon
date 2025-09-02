@@ -57,4 +57,4 @@
 
 - (*, done) Find citations for the QoS models "LinearQoS", "SaturatingExpQoS"
 
-- (*) clean old metrics methods
+- (*, done) clean old metrics methods
