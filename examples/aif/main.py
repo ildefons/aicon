@@ -25,18 +25,13 @@ from yafs.placement import Placement
 from yafs.selection import Selection
 
 # ILDE: added as part of the new agent management network 
-from yafs.management_network import ManagementAgent, ManagementAgentNetwork, DiscretePercentileInterventions
-import simpy
+from yafs.management_network import ManagementAgent, ManagementAgentNetwork
 import numpy as np
 
 
 # Custom agent classes
 class CloudAgent(ManagementAgent):
     def __custom_init__(self):
-        self.myactions = DiscretePercentileInterventions(agent = self, 
-                                                    sim = self.sim, 
-                                                    des_id = self.DES_id, 
-                                                    pctls = [0.1, 0.3, 0.5, 0.7, 1.0])
         self.action_id = 0
 
 
@@ -44,6 +39,7 @@ class CloudAgent(ManagementAgent):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
         #print("CloudAgent.get_management_action()")
+        myactions = self.actions['msg_instructions_pctl']
 
         #get the des_id of the service running in the same node of the agent
         def get_key_by_value(d, x):
@@ -52,24 +48,16 @@ class CloudAgent(ManagementAgent):
                     return k
             raise ValueError(f"Value {x} not found in dictionary")
         service_des_id = get_key_by_value(self.sim.alloc_DES, self.node_id)
-        
+
+        #print(collected_metrics)
+
         #apply action to service with id = service_des_id
-        self.myactions(self.action_id, service_des_id = service_des_id)
+        myactions(self.action_id, service_des_id = service_des_id)
         #rotate action for next time
         self.action_id = self.action_id + 1
-        if self.action_id >= len(self.myactions.pctls):
+        if self.action_id >= len(myactions.pctls):
             self.action_id = 0
-        
 
-        actions = []
-        # incoming_messages = [
-        #     entry for entry in self.sim.metrics.data
-        #     if entry["dst"] == self.node_id and "message" in entry
-        # ]
-        # for msg in incoming_messages:
-        #     self.logger.info(f"CloudAgent: Incoming message {msg['message']} to node {self.node_id}, "
-        #                      f"latency: {msg.get('latency', 'N/A')}, instructions: {msg.get('instructions', 'N/A')}")
-        return actions
 
 class SensorAgent(ManagementAgent):
     def agent_behavior(self, collected_metrics):
@@ -213,7 +201,7 @@ def create_application():
     Messages among MODULES (AppEdge in iFogSim)
     """
     
-    m_a = Message("M.A", "Camera", "ServiceA", instructions=20*10**6, bytes=1000, qos=LinearQoS(L=0.5,R=1.0))   #ILDE: I have added new attribute qos so I can monitor and control the QoS of this message
+    m_a = Message("M.A", "Camera", "ServiceA", instructions=20*10**6, bytes=1000, qos=LinearQoS(L=0.05,R=1.0))   #ILDE: I have added new attribute qos so I can monitor and control the QoS of this message
     m_b = Message("M.B", "ServiceA", "Dashboard", instructions=30*10**6, bytes=500)
 
     """
@@ -330,18 +318,7 @@ def main(simulated_time):
 
     stop_time = simulated_time
     sim = Sim(t, default_results_path=folder_results+"sim_trace")
-    #sim.deploy_app2(app, placement, pop, selectorself.sim.topology.get_info()[0]["WATT"]Path)
-   
 
-    #ILDE: declaration of my management network
-    # agent_configs_json = [
-        #  {"node_id": 0,
-        #   "agent_type": CloudAgent,
-        #   "sleep_time": 10,  
-        #   "instructions_per_wakeup": 5*10*10**8,
-        #   "agent_ipt_percentage": 0.5  #percentage of the node CPU/GPU reserved for the management agent. Needed to compute "service_time" when updating metrics 
-        #  },
-    # ]
     agent_configs_json = [
          {"node_id": 0,
           "agent_type": CloudAgent,
@@ -349,16 +326,32 @@ def main(simulated_time):
           "instructions_per_wakeup": 5*10*10**8,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [0,1],
-          "metrics": {"service_node_utilization": "ServiceNodeUtilization",
-                      "agent_node_utilization": "AgentNodeUtilization",
-                      "node_average_waiting_time": "NodeAverageWaitingTime",
-                      "node_request_waiting_in": "NodeRequestsWaitingIn",
-                      "node_requests_out": "NodeRequestsOut",
-                      "net_buffer_size": "NetBufferSize",
-                      "node_nominalwatt": "NodeNominalWatt",
-                      "linear_cost_buyya": "LinearCostBuyya"
+          "metrics": {"service_node_utilization": {"module":"yafs.management_network", 
+                                                   "class":"ServiceNodeUtilization",
+                                                   "post":{
+                                                       "module":"yafs.management_network",
+                                                       "classs":"PostDiscretize",
+                                                       "params":{
+                                                           "bins": [0,20,40,60,80,100]                                                           
+                                                       }
+                                                    }
+                                                   },
+                      "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
+                      "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
+                      "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
+                      "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
+                      "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
+                      "node_nominalwatt": {"module":"yafs.management_network", "class":"NodeNominalWatt"},
+                      "linear_cost_buyya": {"module":"yafs.management_network", 
+                                            "class":"LinearCostBuyya",
+                                            "params":{"cost_alpha": 1.0}
+                                            }
                      },
-          "cost_alpha": 1.0
+          "actions": {"msg_instructions_pctl": {"module":"yafs.management_network", 
+                                                "class":"DiscretePercentileMessageInstructionsInterventions",
+                                                "params": {"pctls": [0.1, 0.3, 0.5, 0.7, 1.0]},
+                                               },
+                     }
          },
          {"node_id": 1,
           "agent_type": SensorAgent,
@@ -366,16 +359,18 @@ def main(simulated_time):
           "instructions_per_wakeup": 10**8,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [1,2],
-          "metrics": {"service_node_utilization": "ServiceNodeUtilization",
-                      "agent_node_utilization": "AgentNodeUtilization",
-                      "node_average_waiting_time": "NodeAverageWaitingTime",
-                      "node_request_waiting_in": "NodeRequestsWaitingIn",
-                      "node_requests_out": "NodeRequestsOut",
-                      "net_buffer_size": "NetBufferSize",
-                      "node_nominalwatt": "NodeNominalWatt",
-                      "linear_cost_buyya": "LinearCostBuyya"
-                     },
-          "cost_alpha": 1.0
+          "metrics": {"service_node_utilization": {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
+                      "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
+                      "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
+                      "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
+                      "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
+                      "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
+                      "node_nominalwatt": {"module":"yafs.management_network", "class":"NodeNominalWatt"},
+                      "linear_cost_buyya": {"module":"yafs.management_network", 
+                                            "class":"LinearCostBuyya",
+                                            "params":{"cost_alpha": 1.0}
+                                            }
+                     }
          },
          {"node_id": 2,
           "agent_type": ActuatorAgent,
@@ -383,25 +378,22 @@ def main(simulated_time):
           "instructions_per_wakeup": 10*10*10**6,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [2,0],
-          "metrics": {"service_node_utilization": "ServiceNodeUtilization",
-                      "agent_node_utilization": "AgentNodeUtilization",
-                      "node_average_waiting_time": "NodeAverageWaitingTime",
-                      "node_request_waiting_in": "NodeRequestsWaitingIn",
-                      "node_requests_out": "NodeRequestsOut",
-                      "net_buffer_size": "NetBufferSize",
-                      "node_nominalwatt": "NodeNominalWatt",
-                      "linear_cost_buyya": "LinearCostBuyya"
-                     },
-          "cost_alpha": 1.0
+          "metrics": {"service_node_utilization": {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
+                      "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
+                      "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
+                      "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
+                      "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
+                      "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
+                      "node_nominalwatt": {"module":"yafs.management_network", "class":"NodeNominalWatt"},
+                      "linear_cost_buyya": {"module":"yafs.management_network", 
+                                            "class":"LinearCostBuyya",
+                                            "params":{"cost_alpha": 1.0}
+                                            }
+                     }
          }
     ]
 
     management_network = ManagementAgentNetwork("management_network", agent_configs_json, sim)
-    # Set matrix N for your 3-node case
-    # management_network.N[0][0] = (["utilization", "latency", "instructions"], [])  # Cloud: ServiceA
-    # management_network.N[1][1] = (["utilization"], [])  # Sensor: Camera
-    # management_network.N[2][2] = (["latency"], [])  # Actuator: Dashboard
-    #ILDE: end of MN declaration
 
     sim.deploy_app_agentic(app, placement, pop, selectorPath, management_network)
 

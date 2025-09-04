@@ -12,7 +12,7 @@
     - it makes node "IPT" and message "instructions" actionable variables
     -  (No) It may integrate both device usage and energy consumption into an integrated or seprated metrics
 
-- (*) Action to modify node IPT
+- (*, IMHERE) Action to modify node IPT
 
 - (*) Action to modify node agent_ipt_percentage
 

@@ -2,7 +2,7 @@ import simpy
 import numpy as np
 import logging
 import pandas as pd
-import inspect
+import importlib
 
 
 class ManagementAgent:
@@ -16,7 +16,7 @@ class ManagementAgent:
                  agent_ipt_percentage,
                  observable_node_ids,
                  metrics_json,
-                 cost_alpha):
+                 actions_json):
         self.sim = sim
         self.node_id = node_id  # Node where agent is colocated
         self.DES_id = DES_id # Id of the DES process for this agent 
@@ -37,22 +37,49 @@ class ManagementAgent:
         self.agent_filtered_df = None
         self.net_filtered_df = None
 
-        self.cost_alpha = cost_alpha
-
+        # Initialization of "metrics" objects 
         self.metrics = {}
-        for key, value in metrics_json.items():
-            try :
-                import importlib
-                module_name = "yafs.management_network"
-                module = importlib.import_module(module_name) #make it customizable 
-                cls = getattr(module, value)
-                self.metrics[key] = cls(self)
-            except ImportError as e:
-                print("Failed to import module " + module_name +": " + e.msg)
-            except AttributeError as e:
-                print(f"Class '{value}' not found in module: {e}")
-            except Exception as e:
-                print(f"An unexpected error occurred for key '{key}': {e}")
+        if metrics_json:
+            for key, value in metrics_json.items():
+                try :
+                    module_name = value["module"]
+                    module = importlib.import_module(module_name) #make it customizable 
+                    myclass_name = value["class"]
+                    params = value.get("params", {})
+                    cls = getattr(module, myclass_name)
+                    self.metrics[key] = cls(self, **params)
+                except ImportError as e:
+                    print("Failed to import module " + module_name +": " + e.msg)
+                except AttributeError as e:
+                    print(f"Class '{value}' not found in module: {e}")
+                except Exception as e:
+                    print(f"An unexpected error occurred for key '{key}': {e}")
+
+        # Initialization of "actions" objects 
+        self.actions = {}
+        if actions_json:
+            for key, value in actions_json.items():
+                try :
+                    module_name = value["module"]
+                    module = importlib.import_module(module_name) #make it customizable 
+                    myclass_name = value["class"]
+                    params = value.get("params", {})
+                    # Important convention: all "action" classes must have the following paramters in their constructor
+                    params.update({
+                        "agent": self,
+                        "sim": self.sim,
+                        "des_id": self.DES_id
+                    })
+
+                    cls = getattr(module, myclass_name)
+                    self.actions[key] = cls(**params)
+                except ImportError as e:
+                    print("Failed to import module " + module_name +": " + e.msg)
+                except AttributeError as e:
+                    print(f"Class '{value}' not found in module: {e}")
+                except Exception as e:
+                    print(f"An unexpected error occurred for key '{key}': {e}")
+
 
         #call customizable hook
         self.__custom_init__()
@@ -251,14 +278,14 @@ class ManagementAgentNetwork:
             myId = self.sim._Sim__get_id_process()#__get_id_process() is private so I overcome the privatenss explicitly (not nice)
             agent_name = "agent_" + "node" + str(node_id) + "_" + agent_type.__name__
             metrics_json = agent_json["metrics"]
-            cost_alpha = agent_json["cost_alpha"]
+            actions_json = agent_json.get("actions")
 
             #make sure agent_ipt_percentage is within range [0,1]. If not floor it between [0,1] + log a warning
             agent_ipt_percentage_01 = max(0, min(1, agent_ipt_percentage))
 
             #observable_node_ids = agent_json["observable_node_ids"]
             agent = agent_type(self.sim, node_id, myId, agent_name, sleep_time, instructions_per_wakeup, 
-                               agent_ipt_percentage_01, observable_node_ids, metrics_json, cost_alpha)
+                               agent_ipt_percentage_01, observable_node_ids, metrics_json, actions_json)
             self.agents[node_id] = agent
             # start gant process        
 
@@ -522,14 +549,15 @@ class LinearCostBuyya(Metric):
     cost_period = T * alpha * Utilization * Performance
     """
 
-    def __init__(self, agent):
+    def __init__(self, agent, cost_alpha):
         self.agent = agent
+        self.cost_alpha = cost_alpha
     
     def __call__(self):
         def get_utilization(data, id):
             return next((entry['value'] for entry in data if entry['node_id'] == id), None)
         
-        cost_alpha = self.agent.cost_alpha
+        cost_alpha = self.cost_alpha
         agent_ipt_percentage = self.agent.agent_ipt_percentage
         instructions_per_wakeup = self.agent.instructions_per_wakeup
         duration_previous_cycle = self.agent.duration_previous_cycle
@@ -564,6 +592,36 @@ class LinearCostBuyya(Metric):
         
         return results
 
+# Metric post-processing class
+class Postprocessing:
+    
+    def __init__(self):
+        pass
+
+class PostDiscretize(Postprocessing):
+    def __init__(self, bins, labels=None):
+        """
+        Map continuous value into discrete bin index or label.
+
+        bins : sorted list of thresholds (e.g. [0.2, 0.7, 1.0])
+        labels : optional list of labels for each bin
+        Example:
+        discretize(0.5, [0.2, 0.7, 1.0]) -> 1
+        """
+        self.bins = bins
+        self.labels = labels
+
+    def __call__(self, value):
+        """
+        Map continuous value into discrete bin index or label.
+        value : numeric value
+        """
+        idx = np.digitize([value], self.bins)[0] # returns bin index
+        if self.labels:
+            return self.labels[idx]
+        return idx
+
+
 # Intervention Classes
 
 class Intervention:
@@ -574,7 +632,7 @@ class Intervention:
     def f():
         print(2)
 
-class DiscretePercentileInterventions(Intervention):
+class DiscretePercentileMessageInstructionsInterventions(Intervention):
     def __init__(self, agent, sim, des_id, pctls):
         """
         Args:
@@ -606,15 +664,16 @@ class DiscretePercentileInterventions(Intervention):
             action_id: position in list self.pctls 
         """
         if not isinstance(action_id, int):
-            raise TypeError(f"Parameter action_id must be int, but got {type(x).__name__}")
+            raise TypeError(f"Parameter action_id must be int, but got {type(action_id).__name__}")
         if action_id >= len(self.pctls):
             raise ValueError(f"Parameter action_id must be less than {len(self.pctls)}, but got {action_id}")
     
         des_pct_instructions_old = self.sim.des_pct_instructions[service_des_id]
         node_id = self.sim.alloc_DES[service_des_id]
-
+   
         # Perform intervention
         self.sim.des_pct_instructions[service_des_id] = self.pctls[action_id]
+        
 
         # Perform insert intro into action event data base
         self.sim.metrics.insert_action(

@@ -428,9 +428,12 @@ class Sim:
             pct_instructions_tobeused = 1.0  #ILDE: his value is modified by the the corresponding DES process internal variable that can be intervened
             metric_qos = 1.0
             
-            if message.qos is not None: # ILDE: meaning the user explicitly created a QoS object when constructed the first message object 
-                #ILDE: we need to read pct_instructions_tobeused from the corresponding DES process 
-                pct_instructions_tobeused = self.des_pct_instructions[des]
+
+            aux = self.des_pct_instructions.get(des)
+
+            if aux is not None and message.qos is not None:  
+                #ILDE: we need  Message to have a QoS object and self.des_pct_instructions to exist for DES process DES               
+                pct_instructions_tobeused = aux
                 metric_qos = message.qos(pct_instructions_tobeused) # ILDE message.inst
             
             message_instructions_after_qos_adjustment = int(message.inst * metric_qos)
