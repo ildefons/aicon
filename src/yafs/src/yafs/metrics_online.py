@@ -47,7 +47,7 @@ class Metrics_online:
         ]
         self._action_columns = [
             "action_class_type","agent_class_type","action_id",
-            "node_id","agent_des_id","service_des_id","time_intervention","log"
+            "from_node_id","to_node_id","agent_des_id","service_des_id","time_intervention","log"
         ]
 
         # Write headers
@@ -85,7 +85,7 @@ class Metrics_online:
     def insert_action(self, value):
         self.__ff_action.writerow([
             value["action_class_type"], value["agent_class_type"], value["action_id"],
-            value["node_id"], value["agent_des_id"], value["service_des_id"],
+            value["from_node_id"], value["to_node_id"], value["agent_des_id"], value["service_des_id"],
             value["time_intervention"], value["log"]
         ])
 

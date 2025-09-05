@@ -25,7 +25,7 @@ from yafs.placement import Placement
 from yafs.selection import Selection
 
 # ILDE: added as part of the new agent management network 
-from yafs.management_network import ManagementAgent, ManagementAgentNetwork
+from yafs.management_network import ManagementAgent, ManagementAgentNetwork, DiscreteNodeIPTInterventions
 import numpy as np
 
 
@@ -38,8 +38,16 @@ class CloudAgent(ManagementAgent):
     def agent_behavior(self, collected_metrics):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
+        # filtered = [obj for obj in collected_metrics if obj["metric"] == "ServiceNodeUtilization"]
+
+        # print("ALL ServiceNodeUtilization in Cloud Agent:",filtered)
+
         #print("CloudAgent.get_management_action()")
         myactions = self.actions['msg_instructions_pctl']
+
+        myactions2 = self.actions['discrete_node_ipt']
+        
+        myactions2(action_id=2, node_id=self.node_id)
 
         #get the des_id of the service running in the same node of the agent
         def get_key_by_value(d, x):
@@ -326,16 +334,17 @@ def main(simulated_time):
           "instructions_per_wakeup": 5*10*10**8,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [0,1],
-          "metrics": {"service_node_utilization": {"module":"yafs.management_network", 
-                                                   "class":"ServiceNodeUtilization",
-                                                   "post":{
-                                                       "module":"yafs.management_network",
-                                                       "classs":"PostDiscretize",
-                                                       "params":{
-                                                           "bins": [0,20,40,60,80,100]                                                           
-                                                       }
-                                                    }
-                                                   },
+          "metrics": {"service_node_utilization": {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
+                                              #   {"module":"yafs.management_network", 
+                                              #    "class":"ServiceNodeUtilization",
+                                              #    "post":{
+                                              #        "module":"yafs.management_network",
+                                              #        "classs":"PostDiscretize",
+                                              #        "params":{
+                                              #            "bins": [0,20,40,60,80,100]                                                           
+                                              #        }
+                                              #     }
+                                              #    },
                       "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
                       "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
                       "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
@@ -351,6 +360,10 @@ def main(simulated_time):
                                                 "class":"DiscretePercentileMessageInstructionsInterventions",
                                                 "params": {"pctls": [0.1, 0.3, 0.5, 0.7, 1.0]},
                                                },
+                      "discrete_node_ipt": {"module":"yafs.management_network", 
+                                            "class":"DiscreteNodeIPTInterventions",
+                                            "params": {"iptl":[1*10*10**8, 10*10*10**8, 100*10*10**8]},
+                                           },
                      }
          },
          {"node_id": 1,

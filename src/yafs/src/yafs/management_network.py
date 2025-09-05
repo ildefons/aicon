@@ -338,7 +338,7 @@ class ServiceNodeUtilization(Metric):
                 value = 0.0
             else:
 
-                value = df[df["DES.dst"]==id].service.sum()*100/duration_previous_cycle
+                value = df[df["TOPO.dst"]==id].service.sum()*100/duration_previous_cycle
                 value = min(value,100) # in some cases, the "update_metrics function" adds the entry into the DB and still didnt do the last "yield self.env.timeout(service_time)". This needs to be fixed but in the meantime I do this flooring
  
             results.append({
@@ -680,11 +680,56 @@ class DiscretePercentileMessageInstructionsInterventions(Intervention):
             {"action_class_type": self.__class__.__name__,
              "agent_class_type": self.agent.__class__.__name__, 
              "action_id": action_id, 
-             "node_id": node_id,
+             "from_node_id": self.agent.node_id,
+             "to_node_id": node_id,
              "agent_des_id": self.des_id,
              "service_des_id":service_des_id,
              "time_intervention": self.sim.env.now,
              "log": None
              })
 
+class DiscreteNodeIPTInterventions(Intervention):
+    def __init__(self, agent, sim, des_id, iptl):
+        """
+        Args:
+            sim: core simulator with access to intervention vector "sim.des_pct_instructions"
+            des_id. discrete event simulator process id representing the service running in node_id
+            iptl: vector of IPT values
+        """
+           
+        self.agent = agent
+        self.sim = sim
+        self.des_id = des_id
+        
+        if not iptl:
+            raise ValueError("iptl list is empty")
+        
+        self.iptl = iptl
 
+    def __call__(self, action_id, node_id):
+        """
+        applies intervention
+        Args:
+            action_id: position in list self.pctls 
+        """
+        if not isinstance(action_id, int):
+            raise TypeError(f"Parameter action_id must be int, but got {type(action_id).__name__}")
+        if action_id >= len(self.iptl):
+            raise ValueError(f"Parameter action_id must be less than {len(self.pctls)}, but got {action_id}")
+        if node_id not in self.agent.observable_node_ids:
+            raise ValueError(f"Parameter node_id is not in the agent observation_node_ids list")
+
+        self.sim.topology.G.nodes[node_id]["IPT"] = self.iptl[action_id]       
+
+        # Perform insert intro into action event data base
+        self.sim.metrics.insert_action(
+            {"action_class_type": self.__class__.__name__,
+             "agent_class_type": self.agent.__class__.__name__, 
+             "action_id": action_id, 
+             "from_node_id":self.agent.node_id,
+             "to_node_id": node_id,
+             "agent_des_id": self.des_id,
+             "service_des_id":None,
+             "time_intervention": self.sim.env.now,
+             "log": None
+             })

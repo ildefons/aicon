@@ -2,7 +2,7 @@
 
 (*) focuss points
 
-- (*, done) Mtric: average time to start being served
+- (*, done) Metric: average time to start being served
 
 - (*, done) Add cost model (not yet used in lab papers)
     - do research on cost models that can be simulaed (model has to be "citable")
@@ -12,11 +12,11 @@
     - it makes node "IPT" and message "instructions" actionable variables
     -  (No) It may integrate both device usage and energy consumption into an integrated or seprated metrics
 
-- (*, IMHERE) Action to modify node IPT
+- (*, done) Action to modify node IPT
 
-- (*) Action to modify node agent_ipt_percentage
-
-- (*) Revisit Action DiscretePercentileInterventions
+- (*, done) Revisit Action DiscretePercentileInterventions. 
+    - Convert it to action to modify service instance percentile of nominal instructions: "DiscretePercentileMessageInstructionsInterventions"
+    - Make it configurable in the agent "actions" field
 
 - Actions for redirecting incoming messages to other instances of the same service (e.g. used in onloading electric vehicles)
     - Possibility: 
@@ -47,14 +47,27 @@
 
 # New tasks 1/9/2025:
 
-- (*) Convert collected metrics to discrete state space comptible with pymdp
+- (*, NEXT) Convert collected metrics to discrete state space comptible with pymdp
     - (*, done) Consider creating a class for each possible metric and pass the list of metrics to the agent as a list at declaration time
         - class module should be specified in the agent configuration json object (now all in management_network module)
     - What to do with the postprocessing of the metrics (normalization, discretization, ctaegorization, cleaning,....)?
         - BTB up to the custom "agent.agent_behavior()"?
 
-- (*) Do list for intervention classes in the agant declaration json object (jus like metrics)  
+- (*, done) Do list for intervention classes in the agant declaration json object (jus like metrics)  
 
 - (*, done) Find citations for the QoS models "LinearQoS", "SaturatingExpQoS"
 
 - (*, done) clean old metrics methods
+
+# New tasks 5/9/2025:
+
+- (*, NEXT) Postprocessing class and derivates to filter, normalize, discretize metrics
+    - Start when Action to modify node performance is done
+    - Start with PostDiscretize class (code in management_network module)
+    - Make it confifurable inside agent declaration (inside specific fields of a specific metric, look at commented example in aif(main.py))
+
+- (*, NEXT) Consider puting "qos=LinearQoS(L=0.05,R=1.0)" when we add a service module "a.add_service_module("ServiceA", m_a, m_b, fractional_selectivity, threshold=1.0)" instead of in the message
+
+- (*, done) find why NodeServiceUtilization metric not working: df[df["DES.dst"]==id] ---> df[df["TOPO.dst"]==id] 
+
+- (*) Create specific separate modules for: Metrics/Postprocessing, Actions/Interventions 
