@@ -26,7 +26,7 @@
         - Agent can make interventions into the "message forwarding probability vector" to simulate "onloading"
         - Note: this mechanism is interesting to explore decentralized algorithms for resource optimization.
 
-- (*) Actions for deploy/undeploy services on observable nodes (e.g. used in streaming application). 
+- Actions for deploy/undeploy services on observable nodes (e.g. used in streaming application). 
     - It can serve as alternative to "redirecting incoming messages" if the central routing algorithm can redirect messages to nodes with lower demand.
     - What happens when we deploy an application module in a node without agent? is it possible to have nodes without agents (event allways sleeping agents)?
     - What happends if we try to deploy an agent? how would it work (replicate itself, deploy an agent from a library of agents, something else)?
@@ -40,14 +40,14 @@
     - Problem: agents wake up at different rates so is hard to simply colllect once for all
     - Possibility: have a single simpy process that wakesup every T times units and computes all possible new metrics and pushesthem to a simpy store.   
 
-- Elaborated examples:
+- (*) Elaborated examples:
     - Simple examples for custom agents: read metrics, do interventions, define observability set, define QoS class, and so on
     - Depending of implemented interventions: EV case, stream app, federated learning 
 
 
 # New tasks 1/9/2025:
 
-- (*, NEXT) Convert collected metrics to discrete state space comptible with pymdp
+- (*, done) Convert collected metrics to discrete state space comptible with pymdp
     - (*, done) Consider creating a class for each possible metric and pass the list of metrics to the agent as a list at declaration time
         - class module should be specified in the agent configuration json object (now all in management_network module)
     - What to do with the postprocessing of the metrics (normalization, discretization, ctaegorization, cleaning,....)?
@@ -61,13 +61,21 @@
 
 # New tasks 5/9/2025:
 
-- (*, NEXT) Postprocessing class and derivates to filter, normalize, discretize metrics
+- (*, done) Postprocessing class and derivates to filter, normalize, discretize metrics
     - Start when Action to modify node performance is done
     - Start with PostDiscretize class (code in management_network module)
     - Make it confifurable inside agent declaration (inside specific fields of a specific metric, look at commented example in aif(main.py))
 
-- (*, NEXT) Consider puting "qos=LinearQoS(L=0.05,R=1.0)" when we add a service module "a.add_service_module("ServiceA", m_a, m_b, fractional_selectivity, threshold=1.0)" instead of in the message
+- (*, done) Consider puting "qos=LinearQoS(L=0.05,R=1.0)" when we add a service module "a.add_service_module("ServiceA", m_a, m_b, fractional_selectivity, threshold=1.0)" instead of in the message
+    - Now I think that qos on Messasage is better because it gives more selectivity, so not necessary to change  
 
 - (*, done) find why NodeServiceUtilization metric not working: df[df["DES.dst"]==id] ---> df[df["TOPO.dst"]==id] 
 
-- (*, NEXT) Create specific separate modules for: Metrics/Postprocessing, Actions/Interventions 
+- Create specific separate modules for: Metrics/Postprocessing, Actions/Interventions 
+
+# New tasks 8/9/2025:
+
+- (*) AIF Example (and future ones) to dedicated folder "/home/ildefons/yaf310/examples/ayafs"
+
+- (*) list of tests/examples ending on 2 active inference examples with pymdp and gp
+    - 

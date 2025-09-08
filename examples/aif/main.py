@@ -39,7 +39,7 @@ class CloudAgent(ManagementAgent):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
         # filtered = [obj for obj in collected_metrics if obj["metric"] == "ServiceNodeUtilization"]
-
+        # print("COLECTED_METRICS:", collected_metrics)
         # print("ALL ServiceNodeUtilization in Cloud Agent:",filtered)
 
         #print("CloudAgent.get_management_action()")
@@ -270,7 +270,7 @@ def main(simulated_time):
     t.load(t_json)
     nx.write_gexf(t.G,folder_results+"graph_main1") # you can export the Graph in multiples format to view in tools like Gephi, and so on.
 
-    """
+    """qos=LinearQoS(L=0.05,R=1.0))
     APPLICATION
     """
     app = create_application()
@@ -334,17 +334,17 @@ def main(simulated_time):
           "instructions_per_wakeup": 5*10*10**8,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [0,1],
-          "metrics": {"service_node_utilization": {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
-                                              #   {"module":"yafs.management_network", 
-                                              #    "class":"ServiceNodeUtilization",
-                                              #    "post":{
-                                              #        "module":"yafs.management_network",
-                                              #        "classs":"PostDiscretize",
-                                              #        "params":{
-                                              #            "bins": [0,20,40,60,80,100]                                                           
-                                              #        }
-                                              #     }
-                                              #    },
+          "metrics": {"service_node_utilization":# {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
+                                                {"module":"yafs.management_network", 
+                                                 "class":"ServiceNodeUtilization",
+                                                 "post":{
+                                                     "module":"yafs.management_network",
+                                                     "class":"PostDiscretize",
+                                                     "params":{
+                                                         "bins": [0,20,40,60,80,100]                                                           
+                                                     }
+                                                  }
+                                                 },
                       "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
                       "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
                       "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},

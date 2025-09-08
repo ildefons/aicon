@@ -48,6 +48,17 @@ class ManagementAgent:
                     params = value.get("params", {})
                     cls = getattr(module, myclass_name)
                     self.metrics[key] = cls(self, **params)
+                    #post-processing
+                    if "post" in value:
+                        post_value = value.get("post", {})
+                        post_module_name = post_value["module"]
+                        post_module = importlib.import_module(post_module_name) #make it customizable 
+                        post_myclass_name = post_value["class"]
+                        post_params = post_value.get("params", {})
+                        post_cls = getattr(post_module, post_myclass_name)
+                        aux = post_cls(**post_params)
+                        self.metrics[key].post = aux 
+                        
                 except ImportError as e:
                     print("Failed to import module " + module_name +": " + e.msg)
                 except AttributeError as e:
@@ -315,14 +326,41 @@ class Metric:
     
     def __init__(self):
         self.agent = None
+        self.post = None
+    
+    def __call__(self):
+        result = self._call_impl()
+
+        if self.post is not None:
+            try:
+                # Ensure existing_list is a list
+                if not isinstance(result, list):
+                    raise TypeError("existing_list must be a list")
+            
+                for obj in result:
+                    if "value" in obj and obj["value"] is not None:  # check existence and not None
+                        obj["value"] = self.post(obj["value"])
+              
+                return result
+        
+            except Exception as e:
+                print(f"Error appending to list: {e}")
+                
+        return result  # Return original list to avoid data loss
+          
+
+    def _call_impl(self, *args, **kwargs):
+        raise NotImplementedError("Subclasses must implement _call_impl()")
+    
 
 class ServiceNodeUtilization(Metric):
 
     def __init__(self, agent):
+        super().__init__()
         self.agent = agent
 
     
-    def __call__(self):
+    def _call_impl(self):
         
         """
         Returns the service utilization (%) for a list of a observable nodes
@@ -353,9 +391,10 @@ class ServiceNodeUtilization(Metric):
 class AgentNodeUtilization(Metric):
 
     def __init__(self, agent):
+        super().__init__()
         self.agent = agent
     
-    def __call__(self):
+    def _call_impl(self):
             
         """
         Returns the service utilization (%) for a list of a observable nodes
@@ -384,9 +423,10 @@ class AgentNodeUtilization(Metric):
 class NodeAverageWaitingTime(Metric):
 
     def __init__(self, agent):
+        super().__init__()
         self.agent = agent
     
-    def __call__(self):
+    def _call_impl(self):
         """
         Return the average waiting time for an input message/request to start being served
 
@@ -425,9 +465,10 @@ class NodeAverageWaitingTime(Metric):
 class NodeRequestsWaitingIn(Metric):
 
     def __init__(self, agent):
+        super().__init__()
         self.agent = agent
     
-    def __call__(self):
+    def _call_impl(self):
 
         """
         Returns the number of service requests waiting to be served by the node in each observable node 
@@ -463,9 +504,10 @@ class NodeRequestsWaitingIn(Metric):
 class NodeRequestsOut(Metric):
 
     def __init__(self, agent):
+        super().__init__()
         self.agent = agent
     
-    def __call__(self):
+    def _call_impl(self):
         """
         Returns the number of service requests serviced by the node in each observable node since the begining of the simulation
         (note: BTB only 1 app service per node, so is the same a sevice~node) 
@@ -497,9 +539,10 @@ class NodeRequestsOut(Metric):
 class NetBufferSize(Metric):
 
     def __init__(self, agent):
+        super().__init__()
         self.agent = agent
     
-    def __call__(self):
+    def _call_impl(self):
         """
         Returns the most current network buffer size 
 
@@ -513,10 +556,10 @@ class NetBufferSize(Metric):
             value = 0.0
         else:
             value = df.loc[df['ctime'].idxmax(), 'buffer']
-        ret ={"metric": self.__class__.__name__,
+        ret =[{"metric": self.__class__.__name__,
               "node_id": self.agent.node_id,
               "value": value
-             }
+             }]
         
         return ret
 
@@ -524,14 +567,15 @@ class NetBufferSize(Metric):
 class NodeNominalWatt(Metric):
     
     def __init__(self, agent):
+        super().__init__()
         self.agent = agent
     
-    def __call__(self):
+    def _call_impl(self):
         value = self.agent.sim.topology.get_info()[0]["WATT"]
-        ret ={"metric": self.__class__.__name__,
+        ret =[{"metric": self.__class__.__name__,
               "node_id": self.agent.node_id,
               "value": value
-             }
+             }]
         
         return ret
 
@@ -550,10 +594,11 @@ class LinearCostBuyya(Metric):
     """
 
     def __init__(self, agent, cost_alpha):
+        super().__init__()
         self.agent = agent
         self.cost_alpha = cost_alpha
     
-    def __call__(self):
+    def _call_impl(self):
         def get_utilization(data, id):
             return next((entry['value'] for entry in data if entry['node_id'] == id), None)
         
@@ -630,7 +675,7 @@ class Intervention:
         print("DiscreteIntervention to be revised maybe irrelevant")
 
     def f():
-        print(2)
+        pass
 
 class DiscretePercentileMessageInstructionsInterventions(Intervention):
     def __init__(self, agent, sim, des_id, pctls):
