@@ -17,9 +17,9 @@ class LinearQoS:
             if x <= self.L:
                 return 0.0
             elif x >= self.R:
-                return 100.0
+                return 1.0
             else:
-                return 100.0 * (x - self.L) / (self.R - self.L)
+                return 1.0 * (x - self.L) / (self.R - self.L)
 
         self.f = linear_clamped   # store as attribute
 

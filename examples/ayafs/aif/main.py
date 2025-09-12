@@ -88,7 +88,7 @@ class MinimunPath(Selection):
     def get_path(self, sim, app_name, message, topology_src, alloc_DES, alloc_module, traffic,from_des):
 
         """
-        Computes the minimun path https://es.aliexpress.com/item/1005009035988189.html?spm=a2g0o.detail.pcDetailTopMoreOtherSeller.5.774fH4pAH4pAHb&gps-id=pcDetailTopMoreOtherSeller&scm=1007.40050.354490.0&scm_id=1007.40050.354490.0&scm-url=1007.40050.354490.0&pvid=ca075d23-95fb-4777-b411-f42e198e2e62&_t=gps-id:pcDetailTopMoreOtherSeller,scm-url:1007.40050.354490.0,pvid:ca075d23-95fb-4777-b411-f42e198e2e62,tpp_buckets:668%232846%238113%231998&pdp_ext_f=%7B%22order%22%3A%22540%22%2C%22eval%22%3A%221%22%2C%22sceneId%22%3A%2230050%22%7D&pdp_npi=4%40dis%21EUR%213.19%213.19%21%21%2126.19%2126.19%21%40211b80c217534334445801854e3298%2112000047666434150%21rec%21ES%21800113694%21XZ&utparam-url=scene%3ApcDetailTopMoreOtherSeller%7Cquery_from%3Aamong the source elemento of the topology and the localizations of the module
+        Computes the minimun path among the source elemento of the topology and the localizations of the module
 
         Return the path and the identifier of the module deployed in the last element of that path
         """

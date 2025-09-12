@@ -78,4 +78,4 @@
 - (*) AIF Example (and future ones) to dedicated folder "/home/ildefons/yaf310/examples/ayafs"
 
 - (*) list of tests/examples ending on 2 active inference examples with pymdp and gp
-    - 
+    - (*, done) single node action (perception of time) loop: SingleAgentAPL

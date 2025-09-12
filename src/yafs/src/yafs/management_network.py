@@ -447,11 +447,11 @@ class NodeAverageWaitingTime(Metric):
             if df is None or not isinstance(df, pd.DataFrame):
                 value = 0.0
             else:
-                if df[df["DES.dst"]==id].shape[0] == 0:
+                if df[df["TOPO.dst"]==id].shape[0] == 0:
                     value = 0
                 else:                
-                    mean_time_reception = df[df["DES.dst"]==id].time_reception.mean()
-                    mean_time_in = df[df["DES.dst"]==id].time_in.mean()
+                    mean_time_reception = df[df["TOPO.dst"]==id].time_reception.mean()
+                    mean_time_in = df[df["TOPO.dst"]==id].time_in.mean()
                     value = float(mean_time_in - mean_time_reception)
             results.append({
                 "metric": self.__class__.__name__,
