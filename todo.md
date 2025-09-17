@@ -40,11 +40,6 @@
     - Problem: agents wake up at different rates so is hard to simply colllect once for all
     - Possibility: have a single simpy process that wakesup every T times units and computes all possible new metrics and pushesthem to a simpy store.   
 
-- (*) Elaborated examples:
-    - Simple examples for custom agents: read metrics, do interventions, define observability set, define QoS class, and so on
-    - Depending of implemented interventions: EV case, stream app, federated learning 
-
-
 # New tasks 1/9/2025:
 
 - (*, done) Convert collected metrics to discrete state space comptible with pymdp
@@ -79,3 +74,5 @@
 
 - (*) list of tests/examples ending on 2 active inference examples with pymdp and gp
     - (*, done) single node action (perception of time) loop: SingleAgentAPL
+    - (*, NEXT) single node action perception loop using active inference with pymdp: SingleAgentAPLPymdp
+    - (*) multiple agent federated learning example

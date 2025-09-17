@@ -1,5 +1,5 @@
 """
-    Scenario: Single management Agent doing an Action-perception loop according to heuristic rule
+    Scenario: Single management Agent doing an Action-perception loop using heuristic controller
 
     @author: Ildefons Magrans de Abril
 """

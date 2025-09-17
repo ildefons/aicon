@@ -571,14 +571,35 @@ class NodeNominalWatt(Metric):
         self.agent = agent
     
     def _call_impl(self):
-        value = self.agent.sim.topology.get_info()[0]["WATT"]
-        ret =[{"metric": self.__class__.__name__,
-              "node_id": self.agent.node_id,
-              "value": value
-             }]
+        results = []
+        for id in self.agent.observable_node_ids:
+            value = self.agent.sim.topology.get_info()[id]["WATT"]
+            results.append({"metric": self.__class__.__name__,
+                "node_id": id,
+                "value": value
+                })
         
-        return ret
+        return results
 
+
+class NodeIPT(Metric):
+    
+    def __init__(self, agent):
+        super().__init__()
+        self.agent = agent
+    
+    def _call_impl(self):
+        results = []
+        for id in self.agent.observable_node_ids:
+            value = self.agent.sim.topology.get_info()[id]["IPT"]
+            if id==0:
+                print("ipt inside:", value)
+            results.append({"metric": self.__class__.__name__,
+                            "node_id": id,
+                            "value": value
+                           })
+        
+        return results
 
 class LinearCostBuyya(Metric):
 
@@ -764,8 +785,11 @@ class DiscreteNodeIPTInterventions(Intervention):
         if node_id not in self.agent.observable_node_ids:
             raise ValueError(f"Parameter node_id is not in the agent observation_node_ids list")
 
+        print("before:",self.sim.topology.G.nodes[node_id]["IPT"])
+
         self.sim.topology.G.nodes[node_id]["IPT"] = self.iptl[action_id]       
 
+        print("after:",self.sim.topology.G.nodes[node_id]["IPT"] )
         # Perform insert intro into action event data base
         self.sim.metrics.insert_action(
             {"action_class_type": self.__class__.__name__,
