@@ -9,3 +9,9 @@
 build/
 src/yafs.egg-info/
 *.
+# Ignore local logging and results
+examples/ayafs/SingleAgentAPL/logging.ini
+examples/ayafs/SingleAgentAPL/results/
+examples/ayafs/SingleAgentAPLPymdp/logging.ini
+examples/ayafs/SingleAgentAPLPymdp/results/
+src/yafs/src/yafs/metrics_online.py.old
