@@ -1,6 +1,7 @@
 !.gitignore
 .gitconfig
 *.log
+*.csv
 **/__pycache__/
 *.pyc
 !.vscode/settings.json
@@ -8,4 +9,3 @@
 build/
 src/yafs.egg-info/
 *.
-
