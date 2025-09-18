@@ -785,11 +785,11 @@ class DiscreteNodeIPTInterventions(Intervention):
         if node_id not in self.agent.observable_node_ids:
             raise ValueError(f"Parameter node_id is not in the agent observation_node_ids list")
 
-        print("before:",self.sim.topology.G.nodes[node_id]["IPT"])
+        #print("before:",self.sim.topology.G.nodes[node_id]["IPT"])
 
         self.sim.topology.G.nodes[node_id]["IPT"] = self.iptl[action_id]       
 
-        print("after:",self.sim.topology.G.nodes[node_id]["IPT"] )
+        #print("after:",self.sim.topology.G.nodes[node_id]["IPT"] )
         # Perform insert intro into action event data base
         self.sim.metrics.insert_action(
             {"action_class_type": self.__class__.__name__,

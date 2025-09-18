@@ -42,10 +42,10 @@ class CloudAgent(ManagementAgent):
         n_f1 = len(self.actions['discrete_node_ipt'].iptl)
         n_f2 = len(self.metrics["node_average_waiting_time"].post.bins)
         self.state_factors = [n_f1, n_f2]
-        self.n_state_factors = [n_f1, n_f2]
+        self.n_state_factors = len(self.state_factors)
 
         self.obs_modalities = [n_f1, n_f2] # same observation as hidden states
-        self.n_obs_modalities = [n_f1, n_f2]
+        self.n_obs_modalities = len(self.obs_modalities)
 
         self.ACTIONS = list(range(len(self.actions['discrete_node_ipt'].iptl))) 
         self.n_actions = len(self.ACTIONS)
@@ -56,96 +56,117 @@ class CloudAgent(ManagementAgent):
         self.alpha_A = 1.0   # prior for A counts
         self.alpha_B = 1.0   # prior for B counts
 
-        # ---------- Build A_dir ----------
-        # Each A[m] has shape (obs_dim_m, s1, s2, ..., sF)
-        self.A_dir = utils.obj_array( len(self.n_obs_modalities) )
-        for m, n_o in enumerate(self.n_obs_modalities):
-            shape = [n_o] + list(self.n_state_factors)
-            self.A_dir[m] = np.ones(shape) * self.alpha_A
+        self.control_fac_idx = [0]
 
-        # ---------- Build B_dir  ----------
-        # B_f of shape (s_f_next, s_f, n_actions) for every factor.
-        self.B_dir = utils.obj_array( len(self.n_state_factors) )
-        for m, n_f in enumerate(self.n_state_factors):
-            self.B_dir[m] = np.ones((n_f, n_f, self.n_actions)) * self.alpha_B
+        A = utils.obj_array(self.n_obs_modalities)
+        for m, n_obs in enumerate(self.obs_modalities):
+            A[m] = np.ones((n_obs, *self.state_factors)) * self.alpha_A # shape: (n_obs, n_f1, n_f2)
+            # normalize over observation axis
+            A[m] /= A[m].sum(axis=0, keepdims=True)
+
+        B = utils.obj_array(self.n_state_factors)
+        # Factor 0: controlled → shape (n_f1, n_f1, n_actions)
+        B[0] = np.ones((n_f1, n_f1, self.n_actions)) * self.alpha_B
+        # Factor 1: uncontrolled → shape (n_f2, n_f2, 1)
+        B[1] = np.ones((n_f2, n_f2, 1)) * self.alpha_B
 
         # -------------------------
         # Preferences (C) and initial state priors (D)
         # -------------------------
         # Very weak/flat preferences initially (agent indifferent)
 
-        self.C = utils.obj_array(len(self.n_obs_modalities))
-        for m, n_o in enumerate(self.n_obs_modalities):
+        self.C = utils.obj_array(self.n_obs_modalities)
+        for m, n_o in enumerate(self.obs_modalities):
             self.C[m] = np.ones(n_o) / n_o        
 
-        self.D = utils.obj_array(len(self.n_state_factors))
-        for m, n_s in enumerate(self.n_obs_modalities):
+        self.D = utils.obj_array(self.n_state_factors)
+        for m, n_s in enumerate(self.obs_modalities):
             self.D[m] = np.ones(n_s) / n_s  
 
-        # -------------------------
-        # Build initial normalized A & B to pass to Agent
-        # -------------------------
-        def normalize_A_from_dir(A_dir):
-            """Normalize each A_dir into probability A matrices expected by pymdp."""
-            A_norm = utils.obj_array(len(A_dir))
-            for m in range(len(A_dir)):
-                a_dir = A_dir[m]
-                # normalize over the observation axis' columns: each column (given state combination) sums to 1
-                # axis=0 is obs axis; keepdims so broadcasting works
-                A_norm[m] = a_dir / a_dir.sum(axis=0, keepdims=True)
-            return A_norm
+        self.qs_prev = self.C.copy() # this is used in the update of self.B
 
-        def normalize_B_from_dir(B_dir):
-            """Normalize each B_dir into probability B matrices expected by pymdp."""
+        def normalize_B(B_dir):
+            """Normalize each B_dir into probability matrices expected by pymdp."""
             B_norm = utils.obj_array(len(B_dir))
-            for m in range(len(B_dir)):
-                # For each action, normalize columns (current state) so B[:, s, a] sums to 1
-                b_dir = B_dir[m]
-                for a in range(b_dir.shape[2]):
-                    cols = b_dir[:, :, a]
-                    # normalize each column
-                    col_sums = cols.sum(axis=0, keepdims=True)  # shape (1, n_s)
-                    # avoid divide-by-zero
-                    col_sums[col_sums == 0] = 1.0
-                    b_dir[:, :, a] = cols / col_sums
+            for m, b_dir in enumerate(B_dir):
+                # Normalize over columns for each slice along last axis
+                for i in range(b_dir.shape[2]):
+                    mat = b_dir[:, :, i]
+                    col_sums = mat.sum(axis=0, keepdims=True)
+                    col_sums[col_sums == 0] = 1.0  # avoid divide-by-zero
+                    b_dir[:, :, i] = mat / col_sums
                 B_norm[m] = b_dir
             return B_norm
 
-        self.A_init = normalize_A_from_dir(self.A_dir)
-        self.B_init = normalize_B_from_dir(self.B_dir)
+
+        self.A_init = A.copy()
+        self.B_init = normalize_B(B)
+        self.pA = self.A_init.copy()
+        self.pB = self.B_init.copy()
         
         # -------------------------
         # Create pymdp Agent with learning enabled
         # -------------------------
+        #classpymdp.agent.Agent(A, B, C=None, D=None, E=None, H=None, pA=None, pB=None, pD=None, num_controls=None, policy_len=1, inference_horizon=1, control_fac_idx=None, policies=None, gamma=16.0, alpha=16.0, use_utility=True, use_states_info_gain=True, use_param_info_gain=False, action_selection='deterministic', sampling_mode='marginal', inference_algo='VANILLA', inference_params=None, modalities_to_learn='all', lr_pA=1.0, factors_to_learn='all', lr_pB=1.0, lr_pD=1.0, use_BMA=True, policy_sep_prior=False, save_belief_hist=False, A_factor_list=None, B_factor_list=None, sophisticated=False, si_horizon=3, si_policy_prune_threshold=0.0625, si_state_prune_threshold=0.0625, si_prune_penalty=512, ii_depth=10, ii_threshold=0.0625)
         self.pymdp_agent = Agent(
                     A=self.A_init,
                     B=self.B_init,
+                    pA=self.pA,
+                    pB=self.pB,
                     C=self.C,
                     D=self.D,
-                    policy_len=1        # planning horizon (tweak as you like)
+                    control_fac_idx = self.control_fac_idx, # this is the (non-trivial) controllable factor: both 'discrete_node_ipt' and "waiting_time"
+                    policy_len=3        # planning horizon (tweak as you like)
                     )
 
-        print(1)
-         
-
-
+    def one_hot_encode(self, wt, num_classes=4):
+        return np.eye(1, num_classes, k=wt, dtype=int)[0]
+    
     def agent_behavior(self, collected_metrics):
         """Retrieve and log incoming messages to cloud (node_id)."""
 
         wt = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == self.node_id][0]['value']
         ipt = [item for item in collected_metrics if item['metric'] == 'NodeIPT' and item['node_id'] == self.node_id][0]['value']
 
-        print("wt:",wt, ", ipt:",ipt)
+        obs = [ipt, wt]
 
-        myactions2 = self.actions['discrete_node_ipt']
+        print("obs:",obs)
         
-        if self.sim.env.now >= 2000 and wt >= 4:
-            myactions2(action_id=1, node_id=self.node_id)
-        elif self.sim.env.now >= 4000: 
-            if wt == 1:
-                myactions2(action_id=0, node_id=self.node_id)
-            elif wt>=4:
-                myactions2(action_id=1, node_id=self.node_id)       
+        #update posterior aprox of hidden states 
+        qs = self.pymdp_agent.infer_states(obs)
+
+        #update A with the new observation (possible because before we infered qs: variational hidden state)
+        self.pymdp_agent.update_A(obs)
+
+        print("ipt:",ipt, ", wt:",wt)
+
+        myactions = self.actions['discrete_node_ipt']
+
+        now = self.sim.env.now
+        print(now)
+        if now >= 0 and now < 4000:
+            # set C (goal observation distribution) to default uniform no prefference, so do nothing
+            pass 
+
+        elif now >= 4000 and now < 8000:
+            # set C (goal observation distribution) preference to go to low waiting time
+            self.pymdp_agent.C[1] = self.one_hot_encode(1, num_classes=self.obs_modalities[1])
+
+        elif now >= 8000:
+            # set C (goal observation distribution) preference to high waiting time
+            self.pymdp_agent.C[1] = self.one_hot_encode(4, num_classes=self.obs_modalities[1])
+        
+        self.pymdp_agent.infer_policies()
+        # sample action       
+        next_action = self.pymdp_agent.sample_action()  
+        # apply action
+        print("action:", int(next_action[0]))
+        myactions(action_id=int(next_action[0]), node_id=self.node_id)
+        # update B 
+        self.pymdp_agent.update_B(self.qs_prev)
+        # update self.qs_prev
+        self.qs_prev = qs
+ 
 
 
 
@@ -430,7 +451,7 @@ def main(simulated_time):
                                                     "post":{
                                                      "module":"yafs.management_network",
                                                      "class":"PostDiscretize",
-                                                     "params":{"bins": [0,200,400,600,800]}
+                                                     "params":{"bins": [0,200,400,600,800,10000,1000000]}
                                                   }
                                                  },
                       "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
