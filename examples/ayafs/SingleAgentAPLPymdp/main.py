@@ -40,7 +40,7 @@ class CloudAgent(ManagementAgent):
         #Initialize pymdp agent A,B,C,D 
 
         n_f1 = len(self.actions['discrete_node_ipt'].iptl)
-        n_f2 = len(self.metrics["node_average_waiting_time"].post.bins)
+        n_f2 = len(self.metrics["node_average_waiting_time"].post.bins) + 1 # I add 1 becasue post-processing bins work like that
         self.state_factors = [n_f1, n_f2]
         self.n_state_factors = len(self.state_factors)
 
@@ -58,11 +58,34 @@ class CloudAgent(ManagementAgent):
 
         self.control_fac_idx = [0]
 
-        A = utils.obj_array(self.n_obs_modalities)
-        for m, n_obs in enumerate(self.obs_modalities):
-            A[m] = np.ones((n_obs, *self.state_factors)) * self.alpha_A # shape: (n_obs, n_f1, n_f2)
-            # normalize over observation axis
-            A[m] /= A[m].sum(axis=0, keepdims=True)
+        #Make uniform A
+        # A = utils.obj_array(self.n_obs_modalities)
+        # for m, n_obs in enumerate(self.obs_modalities):
+        #     A[m] = np.ones((n_obs, *self.state_factors)) * self.alpha_A # shape: (n_obs, n_f1, n_f2)
+        #     # normalize over observation axis
+        #     A[m] /= A[m].sum(axis=0, keepdims=True)
+
+        # Make each hidden state map deterministically to one observation
+        A = utils.obj_array(2)
+        # Factor 0 100% deterministic
+        # A[0] = np.zeros((n_f1, n_f1, n_f2))
+        # for s1 in range(n_f1):
+        #     # map each hidden state s1 to observation o=s1
+        #     A[0][s1, s1, :] = 1.0
+        # # normalize over observation axis
+        # A[0] /= A[0].sum(axis=0, keepdims=True)
+        #Factor 0 with some small noise
+        A[0] = np.ones((n_f1, n_f1, n_f2)) * 0.1
+        for s1 in range(n_f1):
+            A[0][s1, s1, :] = 0.99
+        A[0] /= A[0].sum(axis=0, keepdims=True)
+
+        # Factor 1
+        A[1] = np.zeros((n_f2, n_f1, n_f2))
+        for s2 in range(n_f2):
+            # map each hidden state s2 to observation o=s2
+            A[1][s2, :, s2] = 1.0
+        A[1] /= A[1].sum(axis=0, keepdims=True)
 
         B = utils.obj_array(self.n_state_factors)
         # Factor 0: controlled → shape (n_f1, n_f1, n_actions)
@@ -101,23 +124,26 @@ class CloudAgent(ManagementAgent):
 
         self.A_init = A.copy()
         self.B_init = normalize_B(B)
-        self.pA = self.A_init.copy()
-        self.pB = self.B_init.copy()
+        self.pA = A.copy()
+        self.pB = B.copy()
         
         # -------------------------
         # Create pymdp Agent with learning enabled
         # -------------------------
         #classpymdp.agent.Agent(A, B, C=None, D=None, E=None, H=None, pA=None, pB=None, pD=None, num_controls=None, policy_len=1, inference_horizon=1, control_fac_idx=None, policies=None, gamma=16.0, alpha=16.0, use_utility=True, use_states_info_gain=True, use_param_info_gain=False, action_selection='deterministic', sampling_mode='marginal', inference_algo='VANILLA', inference_params=None, modalities_to_learn='all', lr_pA=1.0, factors_to_learn='all', lr_pB=1.0, lr_pD=1.0, use_BMA=True, policy_sep_prior=False, save_belief_hist=False, A_factor_list=None, B_factor_list=None, sophisticated=False, si_horizon=3, si_policy_prune_threshold=0.0625, si_state_prune_threshold=0.0625, si_prune_penalty=512, ii_depth=10, ii_threshold=0.0625)
         self.pymdp_agent = Agent(
-                    A=self.A_init,
-                    B=self.B_init,
-                    pA=self.pA,
-                    pB=self.pB,
+                    A=A.copy(),
+                    B=normalize_B(B),
+                    pA=A.copy(),
+                    pB=B.copy(),
+                    lr_pB = 15.0,
                     C=self.C,
                     D=self.D,
-                    control_fac_idx = self.control_fac_idx, # this is the (non-trivial) controllable factor: both 'discrete_node_ipt' and "waiting_time"
-                    policy_len=3        # planning horizon (tweak as you like)
+                    control_fac_idx = [0], # this is the (non-trivial) controllable factor: both 'discrete_node_ipt' and "waiting_time"
+                    policy_len=1        # planning horizon (tweak as you like)
                     )
+        
+        self.prev_analog_wt = 0
 
     def one_hot_encode(self, wt, num_classes=4):
         return np.eye(1, num_classes, k=wt, dtype=int)[0]
@@ -127,46 +153,59 @@ class CloudAgent(ManagementAgent):
 
         wt = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == self.node_id][0]['value']
         ipt = [item for item in collected_metrics if item['metric'] == 'NodeIPT' and item['node_id'] == self.node_id][0]['value']
+        wt_analog = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTimeAnalog' and item['node_id'] == self.node_id][0]['value']
 
-        obs = [ipt, wt]
 
-        print("obs:",obs)
+        inc_wt = wt_analog - self.prev_analog_wt
+        inc_wt_int = 0 #if no increase or decrease
+        if inc_wt > 0:
+            inc_wt_int = 1
+        self.prev_analog_wt = wt_analog
+        obs = [ipt, inc_wt_int]
+
+        print("obs:",obs, inc_wt)
+
+        #print("qs before:", [q.copy() for q in getattr(self.pymdp_agent, "qs", [])])
         
         #update posterior aprox of hidden states 
+
         qs = self.pymdp_agent.infer_states(obs)
 
+        #print("qs after:", qs)
+        
         #update A with the new observation (possible because before we infered qs: variational hidden state)
-        self.pymdp_agent.update_A(obs)
-
-        print("ipt:",ipt, ", wt:",wt)
+        #self.pymdp_agent.update_A(obs)  # I will do later
 
         myactions = self.actions['discrete_node_ipt']
 
         now = self.sim.env.now
         print(now)
-        if now >= 0 and now < 4000:
+        if now >= 0 and now < 500000: 
             # set C (goal observation distribution) to default uniform no prefference, so do nothing
             pass 
 
-        elif now >= 4000 and now < 8000:
-            # set C (goal observation distribution) preference to go to low waiting time
-            self.pymdp_agent.C[1] = self.one_hot_encode(1, num_classes=self.obs_modalities[1])
+        elif now >= 50000 and now < 750000:
+        #     # set C (goal observation distribution) preference to go to low waiting time
+            self.pymdp_agent.C[1] = self.one_hot_encode(0, num_classes=self.obs_modalities[1])
 
-        elif now >= 8000:
-            # set C (goal observation distribution) preference to high waiting time
-            self.pymdp_agent.C[1] = self.one_hot_encode(4, num_classes=self.obs_modalities[1])
+        elif now >= 750000:
+        #     # set C (goal observation distribution) preference to high waiting time
+            self.pymdp_agent.C[1] = self.one_hot_encode(1, num_classes=self.obs_modalities[1])
         
         self.pymdp_agent.infer_policies()
         # sample action       
         next_action = self.pymdp_agent.sample_action()  
         # apply action
-        print("action:", int(next_action[0]))
+        print("action:", next_action)
         myactions(action_id=int(next_action[0]), node_id=self.node_id)
         # update B 
         self.pymdp_agent.update_B(self.qs_prev)
         # update self.qs_prev
+        #aux = qs-self.qs_prev 
+        #nothing_change = all(np.all((sub) == 0) for sub in aux)
+        #print("nothing_change:",nothing_change)
         self.qs_prev = qs
- 
+        
 
 
 
@@ -433,17 +472,12 @@ def main(simulated_time):
     agent_configs_json = [
          {"node_id": 0,
           "agent_type": CloudAgent,
-          "sleep_time": 500,  
+          "sleep_time": 2000,  
           "instructions_per_wakeup": 5*10*10**8,
           "agent_ipt_percentage": 0.5,
           "observable_node_ids": [0,1],
           "metrics": {"service_node_utilization":{"module":"yafs.management_network", 
                                                  "class":"ServiceNodeUtilization",
-                                                 "post":{
-                                                     "module":"yafs.management_network",
-                                                     "class":"PostDiscretize",
-                                                     "params":{"bins": [0,20,40,60,80,100]}
-                                                  }
                                                  },
                       "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
                       "node_average_waiting_time": {"module":"yafs.management_network", 
@@ -451,9 +485,13 @@ def main(simulated_time):
                                                     "post":{
                                                      "module":"yafs.management_network",
                                                      "class":"PostDiscretize",
-                                                     "params":{"bins": [0,200,400,600,800,10000,1000000]}
+                                                     "params":{"bins": [100]} #...-100 --->0
+                                                                                  #101-... --->1
+                                                                                
                                                   }
                                                  },
+                      "node_average_waiting_time_analog": {"module":"yafs.management_network", 
+                                                    "class":"NodeAverageWaitingTimeAnalog"},
                       "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
                       "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
                       "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
@@ -467,17 +505,14 @@ def main(simulated_time):
                                   "post":{
                                         "module":"yafs.management_network",
                                         "class":"PostDiscretize",
-                                        "params":{"bins": [300*10**5-1, 1*10*10**8-1, 10*10*10**8-1, 100*10*10**8-1, 1000*10*10**8-1]}
+                                        "params":{"bins": [300*10**5+1]} # <  300*10**5 ---> 0
+                                                                         # >= 300*10**5+1 ---> 1
                                     }
                                   },
                      },
-          "actions": {"msg_instructions_pctl": {"module":"yafs.management_network", 
-                                                "class":"DiscretePercentileMessageInstructionsInterventions",
-                                                "params": {"pctls": [0.1, 0.3, 0.5, 0.7, 1.0]},
-                                               },
-                      "discrete_node_ipt": {"module":"yafs.management_network", 
+          "actions": {"discrete_node_ipt": {"module":"yafs.management_network", 
                                             "class":"DiscreteNodeIPTInterventions",
-                                            "params": {"iptl":[300*10**5, 1*10*10**8, 10*10*10**8, 100*10*10**8]},
+                                            "params": {"iptl":[300*10**5, 1000*10*10**10]},#, 10*10*10**8, 100*10*10**8]},
                                            },
                      }
          },
@@ -489,7 +524,7 @@ def main(simulated_time):
           "observable_node_ids": [1,2],
           "metrics": {"service_node_utilization": {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
                       "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
-                      "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
+                      #"node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
                       "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
                       "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
                       "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
@@ -508,7 +543,7 @@ def main(simulated_time):
           "observable_node_ids": [2,0],
           "metrics": {"service_node_utilization": {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
                       "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
-                      "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
+                      #"node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
                       "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
                       "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
                       "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
@@ -581,6 +616,6 @@ if __name__ == '__main__':
     logging.config.fileConfig(os.getcwd()+'/logging.ini')
 
     start_time = time.time()
-    main(simulated_time=25500)
+    main(simulated_time=1000000)
 
     print("\n--- %s seconds ---" % (time.time() - start_time))

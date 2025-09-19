@@ -232,6 +232,7 @@ class ManagementAgent:
         # Computation of actual metrics delivered to the agent
         collected_metrics = []
         for metric_key, metric_object in self.metrics.items():
+            # print(metric_key)
             new_metrics = metric_object()
             collected_metrics = self.append_to_json_list(collected_metrics, new_metrics)
 
@@ -462,6 +463,47 @@ class NodeAverageWaitingTime(Metric):
         return results
         
 
+class NodeAverageWaitingTimeAnalog(Metric):
+
+    def __init__(self, agent):
+        super().__init__()
+        self.agent = agent
+    
+    def _call_impl(self):
+        """
+        Return the average waiting time for an input message/request to start being served
+
+        Reminder of relvant data fiels in message event log:
+            time_in: time message started being processed by module
+            time_out: time message ended being processed by module
+            time_emit: time message started to travel the input communication link (opinion from stat code) 
+            time_reception: time message enters in module instance queue (same as time_in if queue empty)
+
+        args: app_filtered_df, duration_previous_cycle
+        """
+        
+        df = self.agent.app_filtered_df
+        
+        results = []
+        for id in self.agent.observable_node_ids:
+            value = 0.0
+            if df is None or not isinstance(df, pd.DataFrame):
+                value = 0.0
+            else:
+                if df[df["TOPO.dst"]==id].shape[0] == 0:
+                    value = 0
+                else:                
+                    mean_time_reception = df[df["TOPO.dst"]==id].time_reception.mean()
+                    mean_time_in = df[df["TOPO.dst"]==id].time_in.mean()
+                    value = float(mean_time_in - mean_time_reception)
+            results.append({
+                "metric": self.__class__.__name__,
+                "node_id": id,
+                "value": value
+            })
+            
+        return results
+
 class NodeRequestsWaitingIn(Metric):
 
     def __init__(self, agent):
@@ -591,9 +633,10 @@ class NodeIPT(Metric):
     def _call_impl(self):
         results = []
         for id in self.agent.observable_node_ids:
-            value = self.agent.sim.topology.get_info()[id]["IPT"]
+            value = self.agent.sim.topology.G.nodes[id]["IPT"]
+            #value = self.agent.sim.topology.get_info()[id]["IPT"] <-- wrong: it returns old initial config data
             if id==0:
-                print("ipt inside:", value)
+                print("ipt inside for node 0 before postprocessing:", value)
             results.append({"metric": self.__class__.__name__,
                             "node_id": id,
                             "value": value
@@ -785,11 +828,11 @@ class DiscreteNodeIPTInterventions(Intervention):
         if node_id not in self.agent.observable_node_ids:
             raise ValueError(f"Parameter node_id is not in the agent observation_node_ids list")
 
-        #print("before:",self.sim.topology.G.nodes[node_id]["IPT"])
+        print("before executing action,ipt:",self.sim.topology.G.nodes[node_id]["IPT"])
 
         self.sim.topology.G.nodes[node_id]["IPT"] = self.iptl[action_id]       
 
-        #print("after:",self.sim.topology.G.nodes[node_id]["IPT"] )
+        print("after executing action, ipt:",self.sim.topology.G.nodes[node_id]["IPT"] )
         # Perform insert intro into action event data base
         self.sim.metrics.insert_action(
             {"action_class_type": self.__class__.__name__,
