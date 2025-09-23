@@ -75,23 +75,43 @@ class CloudAgent(ManagementAgent):
         # # normalize over observation axis
         # A[0] /= A[0].sum(axis=0, keepdims=True)
         #Factor 0 with some small noise
-        A[0] = np.ones((n_f1, n_f1, n_f2)) * 0.1
-        for s1 in range(n_f1):
-            A[0][s1, s1, :] = 0.99
-        A[0] /= A[0].sum(axis=0, keepdims=True)
+        A[0] = np.array([
+            # o0 = 0
+            [[1.0, 1.0],   
+            [0.0, 0.0]],  
+            # o0 = 1
+            [[0.0, 0.0],  
+            [1.0, 1.0]]  
+        ])
+        A[1] = np.array([
+            # o1 = 0
+            [[1.0, 0.0], 
+            [1.0, 0.0]], 
+            # o1 = 1
+            [[0.0, 1.0], 
+            [0.0, 1.0]] 
+        ])
+        # A[0] maps s0 → o0.
+        # A[1] maps s1 → o1.
 
-        # Factor 1
-        A[1] = np.zeros((n_f2, n_f1, n_f2))
-        for s2 in range(n_f2):
-            # map each hidden state s2 to observation o=s2
-            A[1][s2, :, s2] = 1.0
-        A[1] /= A[1].sum(axis=0, keepdims=True)
+
+        # A[0] = np.zeros((n_f1, n_f1, n_f2)) #* 0.1
+        # for s1 in range(n_f1):
+        #     A[0][s1, s1, :] = 1.0#0.99
+        # A[0] /= A[0].sum(axis=0, keepdims=True)
+
+        # # Factor 1
+        # A[1] = np.zeros((n_f2, n_f1, n_f2))
+        # for s2 in range(n_f2):
+        #     # map each hidden state s2 to observation o=s2
+        #     A[1][s2, :, s2] = 1.0
+        # A[1] /= A[1].sum(axis=0, keepdims=True)
 
         B = utils.obj_array(self.n_state_factors)
         # Factor 0: controlled → shape (n_f1, n_f1, n_actions)
         B[0] = np.ones((n_f1, n_f1, self.n_actions)) * self.alpha_B
         # Factor 1: uncontrolled → shape (n_f2, n_f2, 1)
-        B[1] = np.ones((n_f2, n_f2, 1)) * self.alpha_B
+        B[1] = np.ones((n_f2, n_f2, self.n_actions)) * self.alpha_B
 
         # -------------------------
         # Preferences (C) and initial state priors (D)
@@ -136,10 +156,10 @@ class CloudAgent(ManagementAgent):
                     B=normalize_B(B),
                     pA=A.copy(),
                     pB=B.copy(),
-                    lr_pB = 15.0,
+                    lr_pB = 10,
                     C=self.C,
                     D=self.D,
-                    control_fac_idx = [0], # this is the (non-trivial) controllable factor: both 'discrete_node_ipt' and "waiting_time"
+                    control_fac_idx = [0,1], # this is the (non-trivial) controllable factor: both 'discrete_node_ipt' and "waiting_time"
                     policy_len=1        # planning horizon (tweak as you like)
                     )
         
@@ -157,9 +177,9 @@ class CloudAgent(ManagementAgent):
 
 
         inc_wt = wt_analog - self.prev_analog_wt
-        inc_wt_int = 0 #if no increase or decrease
+        inc_wt_int = 1 #if no increase or decrease
         if inc_wt > 0:
-            inc_wt_int = 1
+            inc_wt_int = 0
         self.prev_analog_wt = wt_analog
         obs = [ipt, inc_wt_int]
 
@@ -184,26 +204,35 @@ class CloudAgent(ManagementAgent):
             # set C (goal observation distribution) to default uniform no prefference, so do nothing
             pass 
 
-        elif now >= 50000 and now < 750000:
+        elif now >= 500000 and now < 750000:
         #     # set C (goal observation distribution) preference to go to low waiting time
             self.pymdp_agent.C[1] = self.one_hot_encode(0, num_classes=self.obs_modalities[1])
 
         elif now >= 750000:
         #     # set C (goal observation distribution) preference to high waiting time
-            self.pymdp_agent.C[1] = self.one_hot_encode(1, num_classes=self.obs_modalities[1])
-        
+            self.pymdp_agent.C[1] = self.one_hot_encode(1, num_classes=self.obs_modalities[1]) 
+
+        qs = self.pymdp_agent.infer_states(obs)
+
+        self.pymdp_agent.update_A(obs)
+
         self.pymdp_agent.infer_policies()
         # sample action       
-        next_action = self.pymdp_agent.sample_action()  
+        next_action = None
+        if now < 500000:
+            aux = np.random.choice([0., 1.])
+            next_action = np.array([aux,aux])
+            next_action_aux = self.pymdp_agent.sample_action()  
+        else:
+            next_action = self.pymdp_agent.sample_action()  
         # apply action
         print("action:", next_action)
+        
         myactions(action_id=int(next_action[0]), node_id=self.node_id)
+        
+        print("-------------")
         # update B 
         self.pymdp_agent.update_B(self.qs_prev)
-        # update self.qs_prev
-        #aux = qs-self.qs_prev 
-        #nothing_change = all(np.all((sub) == 0) for sub in aux)
-        #print("nothing_change:",nothing_change)
         self.qs_prev = qs
         
 
