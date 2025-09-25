@@ -35,20 +35,20 @@ from pymdp import utils
 # Custom agent classes
 class CloudAgent(ManagementAgent):
     def __custom_init__(self):
-        self.state_id = 0
+        # self.state_id = 0
 
-        #Initialize pymdp agent A,B,C,D 
+        # #Initialize pymdp agent A,B,C,D 
 
-        n_f1 = len(self.actions['discrete_node_ipt'].iptl)
-        n_f2 = len(self.metrics["node_average_waiting_time"].post.bins) + 1 # I add 1 becasue post-processing bins work like that
-        self.state_factors = [n_f1, n_f2]
-        self.n_state_factors = len(self.state_factors)
+        # n_f1 = len(self.actions['discrete_node_ipt'].iptl)
+        # n_f2 = len(self.metrics["node_average_waiting_time"].post.bins) + 1 # I add 1 becasue post-processing bins work like that
+        # self.state_factors = [n_f1, n_f2]
+        # self.n_state_factors = len(self.state_factors)
 
-        self.obs_modalities = [n_f1, n_f2] # same observation as hidden states
-        self.n_obs_modalities = len(self.obs_modalities)
+        self.obs_modalities = [2, 2] # same observation as hidden states
+        # self.n_obs_modalities = len(self.obs_modalities)
 
-        self.ACTIONS = list(range(len(self.actions['discrete_node_ipt'].iptl))) 
-        self.n_actions = len(self.ACTIONS)
+        # self.ACTIONS = list(range(len(self.actions['discrete_node_ipt'].iptl))) 
+        # self.n_actions = len(self.ACTIONS)
 
         # ---from pymdp import utils----------------------
         # Dirichlet priors (pseudo-counts)
@@ -56,77 +56,65 @@ class CloudAgent(ManagementAgent):
         self.alpha_A = 1.0   # prior for A counts
         self.alpha_B = 1.0   # prior for B counts
 
-        self.control_fac_idx = [0]
+        n_states = 4  
 
-        #Make uniform A
-        # A = utils.obj_array(self.n_obs_modalities)
-        # for m, n_obs in enumerate(self.obs_modalities):
-        #     A[m] = np.ones((n_obs, *self.state_factors)) * self.alpha_A # shape: (n_obs, n_f1, n_f2)
-        #     # normalize over observation axis
-        #     A[m] /= A[m].sum(axis=0, keepdims=True)
-
-        # Make each hidden state map deterministically to one observation
+        # Two observation modalities, each with 2 possible observations
         A = utils.obj_array(2)
-        # Factor 0 100% deterministic
-        # A[0] = np.zeros((n_f1, n_f1, n_f2))
-        # for s1 in range(n_f1):
-        #     # map each hidden state s1 to observation o=s1
-        #     A[0][s1, s1, :] = 1.0
-        # # normalize over observation axis
-        # A[0] /= A[0].sum(axis=0, keepdims=True)
-        #Factor 0 with some small noise
-        A[0] = np.array([
-            # o0 = 0
-            [[1.0, 1.0],   
-            [0.0, 0.0]],  
-            # o0 = 1
-            [[0.0, 0.0],  
-            [1.0, 1.0]]  
-        ])
-        A[1] = np.array([
-            # o1 = 0
-            [[1.0, 0.0], 
-            [1.0, 0.0]], 
-            # o1 = 1
-            [[0.0, 1.0], 
-            [0.0, 1.0]] 
-        ])
-        # A[0] maps s0 → o0.
-        # A[1] maps s1 → o1.
 
+        # state 0 = (f0=0, f1=0)
+        # state 1 = (f0=0, f1=1)
+        # state 2 = (f0=1, f1=0)
+        # state 3 = (f0=1, f1=1)
 
-        # A[0] = np.zeros((n_f1, n_f1, n_f2)) #* 0.1
-        # for s1 in range(n_f1):
-        #     A[0][s1, s1, :] = 1.0#0.99
-        # A[0] /= A[0].sum(axis=0, keepdims=True)
+        # Modality 0 (observes factor0)
+        A[0] = np.zeros((2, n_states))
+        # if hidden state has f0=0 → observe 0, if f0=1 → observe 1
+        A[0][0, [0,1]] = 1.0   # states where f0=0
+        A[0][1, [2,3]] = 1.0   # states where f0=1
 
-        # # Factor 1
-        # A[1] = np.zeros((n_f2, n_f1, n_f2))
-        # for s2 in range(n_f2):
-        #     # map each hidden state s2 to observation o=s2
-        #     A[1][s2, :, s2] = 1.0
-        # A[1] /= A[1].sum(axis=0, keepdims=True)
+        # Modality 1 (observes factor1)
+        A[1] = np.zeros((2, n_states))
+        # if hidden state has f1=0 → observe 0, if f1=1 → observe 1
+        A[1][0, [0,2]] = 1.0   # states where f1=0
+        A[1][1, [1,3]] = 1.0   # states where f1=1
 
-        B = utils.obj_array(self.n_state_factors)
-        # Factor 0: controlled → shape (n_f1, n_f1, n_actions)
-        B[0] = np.ones((n_f1, n_f1, self.n_actions)) * self.alpha_B
-        # Factor 1: uncontrolled → shape (n_f2, n_f2, 1)
-        B[1] = np.ones((n_f2, n_f2, self.n_actions)) * self.alpha_B
+        n_actions = 2
 
+        # B = utils.obj_array(1)  # one hidden factor
+
+        # # Shape: (n_states, n_states, n_actions)
+        # B[0] = np.zeros((n_states, n_states, n_actions))
+
+        # # Action 0 → go to state0 regardless of current state
+        # B[0][0, :, 0] = 1.0
+
+        # # Action 1 → go to state3 regardless of current state
+        # B[0][3, :, 1] = 1.0
+        B = utils.obj_array(1)  # single hidden factor
+
+        # Uniform over next states for each action
+        B[0] = np.ones((n_states, n_states, n_actions)) / n_states
+  
         # -------------------------
         # Preferences (C) and initial state priors (D)
         # -------------------------
         # Very weak/flat preferences initially (agent indifferent)
 
-        self.C = utils.obj_array(self.n_obs_modalities)
-        for m, n_o in enumerate(self.obs_modalities):
-            self.C[m] = np.ones(n_o) / n_o        
+        C = utils.obj_array(2)
 
-        self.D = utils.obj_array(self.n_state_factors)
-        for m, n_s in enumerate(self.obs_modalities):
-            self.D[m] = np.ones(n_s) / n_s  
+        # Modality 0: 2 outcomes, uniform
+        C[0] = np.array([0.5, 0.5])
 
-        self.qs_prev = self.C.copy() # this is used in the update of self.B
+        # Modality 1: 2 outcomes, uniform
+        C[1] = np.array([0.5, 0.5])
+
+        D = utils.obj_array(1)
+
+        # Uniform prior over 4 hidden states
+        D[0] = np.ones(n_states) / n_states
+
+ 
+        self.qs_prev = C.copy() # this is used in the update of self.B
 
         def normalize_B(B_dir):
             """Normalize each B_dir into probability matrices expected by pymdp."""
@@ -153,17 +141,20 @@ class CloudAgent(ManagementAgent):
         #classpymdp.agent.Agent(A, B, C=None, D=None, E=None, H=None, pA=None, pB=None, pD=None, num_controls=None, policy_len=1, inference_horizon=1, control_fac_idx=None, policies=None, gamma=16.0, alpha=16.0, use_utility=True, use_states_info_gain=True, use_param_info_gain=False, action_selection='deterministic', sampling_mode='marginal', inference_algo='VANILLA', inference_params=None, modalities_to_learn='all', lr_pA=1.0, factors_to_learn='all', lr_pB=1.0, lr_pD=1.0, use_BMA=True, policy_sep_prior=False, save_belief_hist=False, A_factor_list=None, B_factor_list=None, sophisticated=False, si_horizon=3, si_policy_prune_threshold=0.0625, si_state_prune_threshold=0.0625, si_prune_penalty=512, ii_depth=10, ii_threshold=0.0625)
         self.pymdp_agent = Agent(
                     A=A.copy(),
-                    B=normalize_B(B),
+                    B=B.copy(),
                     pA=A.copy(),
                     pB=B.copy(),
-                    lr_pB = 10,
-                    C=self.C,
-                    D=self.D,
-                    control_fac_idx = [0,1], # this is the (non-trivial) controllable factor: both 'discrete_node_ipt' and "waiting_time"
+                    #lr_pB = 10,
+                    C=C,
+                    D=D,
+                    #control_fac_idx = [0], # this is the (non-trivial) controllable factor: both 'discrete_node_ipt' and "waiting_time"
                     policy_len=1        # planning horizon (tweak as you like)
                     )
         
         self.prev_analog_wt = 0
+        self.prev_action = 0
+        self.first_iter = True
+        self.do_trainB = True
 
     def one_hot_encode(self, wt, num_classes=4):
         return np.eye(1, num_classes, k=wt, dtype=int)[0]
@@ -185,54 +176,41 @@ class CloudAgent(ManagementAgent):
 
         print("obs:",obs, inc_wt)
 
-        #print("qs before:", [q.copy() for q in getattr(self.pymdp_agent, "qs", [])])
-        
-        #update posterior aprox of hidden states 
-
-        qs = self.pymdp_agent.infer_states(obs)
-
-        #print("qs after:", qs)
-        
-        #update A with the new observation (possible because before we infered qs: variational hidden state)
-        #self.pymdp_agent.update_A(obs)  # I will do later
-
         myactions = self.actions['discrete_node_ipt']
 
         now = self.sim.env.now
         print(now)
-        if now >= 0 and now < 500000: 
+        if now >= 0 and now < 50000: 
             # set C (goal observation distribution) to default uniform no prefference, so do nothing
             pass 
 
-        elif now >= 500000 and now < 750000:
+        elif now >= 50000 and now < 100000:
         #     # set C (goal observation distribution) preference to go to low waiting time
-            self.pymdp_agent.C[1] = self.one_hot_encode(0, num_classes=self.obs_modalities[1])
+            self.do_trainB = False
+            self.pymdp_agent.C[1] = self.one_hot_encode(1, num_classes=self.obs_modalities[1])
 
-        elif now >= 750000:
+        elif now >= 100000:
         #     # set C (goal observation distribution) preference to high waiting time
-            self.pymdp_agent.C[1] = self.one_hot_encode(1, num_classes=self.obs_modalities[1]) 
+            self.do_trainB = False
+            self.pymdp_agent.C[1] = self.one_hot_encode(0, num_classes=self.obs_modalities[1]) 
 
         qs = self.pymdp_agent.infer_states(obs)
 
-        self.pymdp_agent.update_A(obs)
+        # update_B can only be done starting from second iteration
+        if self.first_iter != True and self.do_trainB:
+            self.pymdp_agent.update_B(self.qs_prev)
+        else:
+            self.first_iter = False
 
         self.pymdp_agent.infer_policies()
         # sample action       
-        next_action = None
-        if now < 500000:
-            aux = np.random.choice([0., 1.])
-            next_action = np.array([aux,aux])
-            next_action_aux = self.pymdp_agent.sample_action()  
-        else:
-            next_action = self.pymdp_agent.sample_action()  
+        next_action = self.pymdp_agent.sample_action()  
         # apply action
-        print("action:", next_action)
-        
-        myactions(action_id=int(next_action[0]), node_id=self.node_id)
-        
+        myaction = int(next_action[0])   
+        print("action:", next_action,myaction)  
+        myactions(action_id=myaction, node_id=self.node_id)
+        self.prev_action = myaction
         print("-------------")
-        # update B 
-        self.pymdp_agent.update_B(self.qs_prev)
         self.qs_prev = qs
         
 
@@ -645,6 +623,6 @@ if __name__ == '__main__':
     logging.config.fileConfig(os.getcwd()+'/logging.ini')
 
     start_time = time.time()
-    main(simulated_time=1000000)
+    main(simulated_time=150000)
 
     print("\n--- %s seconds ---" % (time.time() - start_time))
