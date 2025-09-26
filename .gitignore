@@ -15,3 +15,7 @@ examples/ayafs/SingleAgentAPL/results/
 examples/ayafs/SingleAgentAPLPymdp/logging.ini
 examples/ayafs/SingleAgentAPLPymdp/results/
 src/yafs/src/yafs/metrics_online.py.old
+
+examples/ayafs/FederatedLearning/logging.ini
+examples/ayafs/FederatedLearning/results/graph_main1
+examples/ayafs/SingleAgentAPLPymdp/test.ipynb
