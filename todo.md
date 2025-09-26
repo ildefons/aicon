@@ -74,5 +74,5 @@
 
 - (*) list of tests/examples ending on 2 active inference examples with pymdp and gp
     - (*, done) single node action (perception of time) loop: SingleAgentAPL
-    - (*, NEXT) single node action perception loop using active inference with pymdp: SingleAgentAPLPymdp
-    - (*) multiple agent federated learning example
+    - (*, done) single node action perception loop using active inference with pymdp: SingleAgentAPLPymdp
+    - (*, next) multiple agent federated learning example: FederatedLearning
