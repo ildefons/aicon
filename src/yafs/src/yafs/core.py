@@ -194,6 +194,7 @@ class Sim:
         """
         #TODO IMPROVE asignation of topo = alloc_DES(IdDES) , It has to move to the get_path process
         try:
+
             paths,DES_dst = self.selector_path[app_name].get_path(self,app_name, message, self.alloc_DES[idDES], self.alloc_DES, self.alloc_module, self.last_busy_time,from_des=idDES)
 
             if DES_dst == [None] or DES_dst==[[]]:
@@ -242,12 +243,12 @@ class Sim:
             #print("1 pipe size before get:",len(self.network_ctrl_pipe.items), " time now:", self.env.now)
             message = yield self.network_ctrl_pipe.get()
             #print("2 pipe size before get:",len(self.network_ctrl_pipe.items), " time now:", self.env.now)
-            # print "NetworkProcess --- Current time %d " %self.env.now
-            # print "name " + message.name
-            # print "Path:",message.path
-            # print "DST_INT:",message.dst_int
+            # print("NetworkProcess --- Current time %d " %self.env.now)
+            # print("name " + message.name)
+            # print("Path:",message.path)
+            # print("DST_INT:",message.dst_int)
             # #print message.timestamp
-            # print "DST",message.dst
+            # print("DST",message.dst)
 
 
             # If same SRC and PATH or the message has achieved the penultimate node to reach the dst
@@ -639,6 +640,9 @@ class Sim:
                 #     print("check consumer_pipe ",app_name,module,ides, " size:", len(self.consumer_pipes["%s%s%i"%(app_name,module,ides)].items), " time:",self.env.now)
                 #print(1,self.env.now)
                 msg = yield self.consumer_pipes["%s%s%i"%(app_name,module,ides)].get()
+
+
+
                 # One pipe for each module name
                 #print(2,self.env.now)
                 m = self.apps[app_name].services[module]
@@ -660,17 +664,17 @@ class Sim:
                         """
                         Processing the message
                         """
-                        # if ides == 3:
-                        #     print "Consumer Message: %d " % self.env.now
-                        #     print "MODULE DES: ",ides
-                        #     print "id ",msg.id
-                        #     print "name ",msg.name
-                        #     print msg.path
-                        #     print msg.dst_int
-                        #     print msg.timestamp
-                        #     print msg.dst
-                        #
-                        #     print "-" * 30
+                        # if ides == 1:
+                        #     print( "Consumer Message: %d " % self.env.now)
+                        #     print("MODULE DES: ",ides)
+                            # print "id ",msg.id
+                            # print "name ",msg.name
+                            # print msg.path
+                            # print msg.dst_int
+                            # print msg.timestamp
+                            # print msg.dst
+                        
+                            # print "-" * 30
 
                         #The module only computes this type of message one time.
                         #It records once

@@ -36,6 +36,7 @@ class ManagementAgent:
         self.app_filtered_df = None
         self.agent_filtered_df = None
         self.net_filtered_df = None
+        self.net_event_df = None
 
         # Initialization of "metrics" objects 
         self.metrics = {}
@@ -228,6 +229,7 @@ class ManagementAgent:
         self.app_filtered_df = app_filtered_df
         self.agent_filtered_df = agent_filtered_df
         self.net_filtered_df = net_filtered_df
+        self.net_event_df = net_event_df
 
         # Computation of actual metrics delivered to the agent
         collected_metrics = []
@@ -440,6 +442,9 @@ class NodeAverageWaitingTime(Metric):
         args: app_filtered_df, duration_previous_cycle
         """
         
+        # if self.agent.node_id == 3:
+        #     print(3)
+
         df = self.agent.app_filtered_df
         
         results = []
@@ -591,13 +596,15 @@ class NetBufferSize(Metric):
         args: net_filtered_df
         """
 
-        df = self.agent.net_filtered_df
-
+        df = self.agent.net_event_df  #Note: I take the NON filtered because I am reading a feature from the "whole" network 
         value = 0.0
         if df is None or not isinstance(df, pd.DataFrame):
             value = 0.0
         else:
-            value = df.loc[df['ctime'].idxmax(), 'buffer']
+            if df.shape[0] == 0:
+                value = 0.0
+            else:
+                value = df.loc[df['ctime'].idxmax(), 'buffer']
         ret =[{"metric": self.__class__.__name__,
               "node_id": self.agent.node_id,
               "value": value

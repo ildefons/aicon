@@ -39,13 +39,25 @@ import numpy as np
 
 
 # Custom agent classes
-class CloudAgent(ManagementAgent):
+class ServiceLeaderAgent(ManagementAgent):
     def __custom_init__(self):
         self.state_id = 0
 
 
     def agent_behavior(self, collected_metrics):
         """Retrieve and log incoming messages to cloud (node_id)."""
+
+        print("inside ServiceLeaderAgent")
+        wt3 = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == 3][0]['value']
+        wt4 = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == 4][0]['value']
+        print("wt3: ", wt3, ", wt4:", wt4)
+        
+        # if worker 1 + 2 (mean) wt > 500 and high qos, lower qos
+
+        # if worker 1 + 2 (mean) wt <= 500 and low qos, raise qos
+
+        # Motivaion: first the Leader tries to control wt by adjusting qos for all workers, if this fails, individual workers will raise/low locl ipt/resources
+        # Why: Goal try to see distributed control, oscilations, different regimes
 
         # myactions2 = self.actions['discrete_node_ipt']
         
@@ -63,21 +75,21 @@ class CloudAgent(ManagementAgent):
         #         myactions2(action_id=0, node_id=self.node_id)  #We move to low performance          
 
 
-class SensorAgent(ManagementAgent):
+class WorkerAgent(ManagementAgent):
     def agent_behavior(self, collected_metrics):
         """Sensor monitors metrics (no actions for now)."""
 
-        #print("SensorAgent.get_management_action()")
+        print("inside WorkerAgent")
+        wt = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == self.node_id][0]['value']
+        print("wt: ", wt)
+
+        # if worker wt > 1000 and lower tier ipt, increase ipt
+
+        # if worker wt <= 1000 and high tier ipt, lower ipt
 
         return []  # Extensible for future logic
 
-class ActuatorAgent(ManagementAgent):
-    def agent_behavior(self, collected_metrics):
-        """Actuator monitors metrics (no actions for now)."""
 
-        #print("ActuatorAgent.get_management_action()")
-
-        return []  # Extensible for future logic
 
 class MinimunPath(Selection):
 
@@ -90,7 +102,8 @@ class MinimunPath(Selection):
         """
         node_src = topology_src
         DES_dst = alloc_module[app_name][message.dst]
-
+        # if message.dst == "ServiceWorker":
+        #     print(3)
         # print(("GET PATH"))
         # print(("\tNode _ src (id_topology): %i" %node_src))
         # print(("\tRequest service: %s " %message.dst))
@@ -98,6 +111,11 @@ class MinimunPath(Selection):
 
         bestPath = []
         bestDES = []
+
+        #ILDE: if more than 1 instance of the target module, I pick 1 randomly so I prevent the same instance being called all the time
+        if len(DES_dst) > 1:
+            aux = [random.choice(DES_dst)]
+            DES_dst = aux    
 
         for des in DES_dst: ## In this case, there are only one deployment
             dst_node = alloc_DES[des]
@@ -107,6 +125,8 @@ class MinimunPath(Selection):
 
             bestPath = [path]
             bestDES = [des]
+    
+        
 
         return bestPath, bestDES
 
@@ -166,7 +186,7 @@ class MinPath_RoundRobin(Selection):
         return bestPath, bestDES
 
 
-class CloudPlacement(Placement):
+class FederatedPlacement(Placement):
     """
     This implementation locates the services of the application 
     in the cheapest cloud regardless of where the sources or sinks are located.
@@ -176,17 +196,23 @@ class CloudPlacement(Placement):
     """
     def initial_allocation(self, sim, app_name):
         #We find the ID-nodo/resource
-        value = {"mytag": "cloud"} # or whatever tag
 
-        id_cluster = sim.topology.find_IDs(value)
         app = sim.apps[app_name]
         services = app.services
 
-        for module in services:
-            if module in self.scaleServices:
-                for rep in range(0, self.scaleServices[module]):
-                    idDES = sim.deploy_module(app_name,module,services[module],id_cluster)
+        id_cluster1 = [1]
+        module1 = 'ServiceLeader1'
+        idDES1 = sim.deploy_module(app_name,module1,services[module1],id_cluster1)
 
+        id_cluster2 = [2]
+        module2 = 'ServiceLeader2'
+        idDES2 = sim.deploy_module(app_name,module2,services[module2],id_cluster2)
+
+        id_cluster3 = [3]
+        module3 = 'ServiceWorker'
+        idDES3 = sim.deploy_module(app_name,module3,services[module3],id_cluster3)  
+        id_cluster4 = [4]
+        idDES4 = sim.deploy_module(app_name,module3,services[module3],id_cluster4)  # NOTE: 3 types of services but 4 deployed instances (1 leader1, 1 leader2, 2 workers)
     #end function
 
 RANDOM_SEED = 1
@@ -207,16 +233,17 @@ def create_application():
     # m2: request for model integation: 2)3)---1)
 
     a.set_modules([{"MinibatchCreator":{"Type":Application.TYPE_SOURCE}},
-                   {"ModelLeader": {"RAM": 10, "Type": Application.TYPE_MODULE}},
-                   {"ModelWorker": {"RAM": 10, "Type": Application.TYPE_MODULE}},
+                   {"ServiceLeader1": {"RAM": 10, "Type": Application.TYPE_MODULE}},
+                   {"ServiceLeader2": {"RAM": 10, "Type": Application.TYPE_MODULE}},
+                   {"ServiceWorker": {"RAM": 10, "Type": Application.TYPE_MODULE}},
                    {"Dashboard": {"Type": Application.TYPE_SINK}}
                   ])
 
 
-    m_0 = Message("M0", "MinibatchCreator", "ModelLeader", instructions=20*10**5, bytes=1000)
-    m_1 = Message("M1", "ModelLeader", "ModelWoker",instructions=20*10**6, bytes=1000)
-    m_2 = Message("M2", "ModelWoker", "ModelLeader", instructions=20*10**5, bytes=1000)
-    m_3 = Message("M3", "ModelLeader", "Dashboard", instructions=20*10**3, bytes=1000)
+    m_0 = Message("M0", "MinibatchCreator", "ServiceLeader1", instructions=20*10**5, bytes=1000, qos=LinearQoS(L=0.05,R=1.0))
+    m_1 = Message("M1", "ServiceLeader1", "ServiceWorker",instructions=20*10**5, bytes=1000)
+    m_2 = Message("M2", "ServiceWorker", "ServiceLeader2", instructions=20*10**5, bytes=1000)
+    m_3 = Message("M3", "ServiceLeader2", "Dashboard", instructions=20*10**3, bytes=1000)
 
     # """
     # Messages among MODULES (AppEdge in iFogSim)
@@ -262,20 +289,22 @@ def create_json_topology():
     # actuator_dev = {"id": 2, "model": "actuator-device", "IPT": 100 * 10 ** 7, "RAM": 4000,"COST": 3, "WATT": 40.0}
 
     minibatch_creator_dev    = {"id": 0, "model": "mb_dev","mytag":"mb_dev", "IPT": 100 * 10 ** 6, "RAM": 40000,"COST": 3,"WATT":40.0}
-    service_leader_dev   = {"id": 1, "model": "service-leader-device","mytag":"service-leader-device", "IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
-    service_worker_dev1   = {"id": 2, "model": "service-worker-device","mytag":"service-worker-device", "IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
-    service_worker_dev2   = {"id": 3, "model": "service-worker-device","mytag":"service-worker-device", "IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
-    dashboard_dev   = {"id": 4, "model": "dashboard-device", "IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
+    service_leader_dev1   = {"id": 1, "model": "service-leader-device","mytag":"service-leader-device", "IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
+    service_leader_dev2   = {"id": 2, "model": "service-leader-device","mytag":"service-leader-device", "IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
+    service_worker_dev1   = {"id": 3, "model": "service-worker-device","mytag":"service-worker-device", "IPT": 10* 10 ** 5, "RAM": 4000,"COST": 3,"WATT":40.0}
+    service_worker_dev2   = {"id": 4, "model": "service-worker-device","mytag":"service-worker-device", "IPT": 10* 10 ** 5, "RAM": 4000,"COST": 3,"WATT":40.0}
+    dashboard_dev   = {"id": 5, "model": "dashboard-device", "mytag":"dashboard-device","IPT": 100* 10 ** 6, "RAM": 4000,"COST": 3,"WATT":40.0}
 
-    link1 = {"s": 0, "d": 1, "BW": 1, "PR": 1}
-    link2 = {"s": 1, "d": 2, "BW": 1, "PR": 1}
-    link3 = {"s": 1, "d": 3, "BW": 1, "PR": 1}
-    link4 = {"s": 1, "d": 4, "BW": 1, "PR": 1}
-
-    # link2 = {"s": 0, "d": 2, "BW": 1, "PR": 1}
+    link1 = {"s": 0, "d": 1, "BW": 1, "PR": 1}  #MBSource--->Leader1
+    link2 = {"s": 1, "d": 3, "BW": 1, "PR": 1}  #Leader1--->Worker1     
+    link3 = {"s": 1, "d": 4, "BW": 1, "PR": 1}  #Leader1--->Worker2
+    link4 = {"s": 3, "d": 2, "BW": 1, "PR": 1}  #Worker1--->Leader2
+    link5 = {"s": 4, "d": 2, "BW": 1, "PR": 1}  #Worker2--->leader2
+    link6 = {"s": 2, "d": 5, "BW": 1, "PR": 1}  #leader2--->Dashboard
 
     topology_json["entity"].append(minibatch_creator_dev)
-    topology_json["entity"].append(service_leader_dev)
+    topology_json["entity"].append(service_leader_dev1)
+    topology_json["entity"].append(service_leader_dev2)
     topology_json["entity"].append(service_worker_dev1)
     topology_json["entity"].append(service_worker_dev2)
     topology_json["entity"].append(dashboard_dev)
@@ -283,6 +312,8 @@ def create_json_topology():
     topology_json["link"].append(link2)
     topology_json["link"].append(link3)
     topology_json["link"].append(link4)
+    topology_json["link"].append(link5)
+    topology_json["link"].append(link6)
 
     return topology_json
 
@@ -312,18 +343,7 @@ def main(simulated_time):
     PLACEMENT algorithm
     """
     
-    #<---------------IMHERE
-    
-    placement = CloudPlacement("onCloud") # it defines the deployed rules: module-device
-    placement.scaleService({"ServiceA": 1}) 
-    #In their case, the use a statical assignment.management_network.N[0][0] = (["utilization", "latency", "instructions"], ["instructions"])  # Cloud: ServiceA
-    pop = Statical("Statical")
-    #For each type of sink modules we set a deployment on some type of devices
-    #A control sink consists on:
-    #  args:
-    #     model (str): identifies the device or devices where the sink is linked
-    #     number (int): quantity of sinks linked in each device
-    #     module (str): identifies the module from the app who r
+    placement = FederatedPlacement("fl") # it defines the deployed rules: module-device
 
     """
     POPULATION algorithm
@@ -338,7 +358,7 @@ def main(simulated_time):
     #     model (str): identifies the device or devices where the sink is linked
     #     number (int): quantity of sinks linked in each device
     #     module (str): identifies the module from the app who receives the messages
-    pop.set_sink_control({"model": "actuator-device",
+    pop.set_sink_control({"model": "dashboard-device",
                           "number":1,
                           "module": "Dashboard"}) # ILDE  app.get_sink_modules()})
 
@@ -364,12 +384,12 @@ def main(simulated_time):
     sim = Sim(t, default_results_path=folder_results+"sim_trace")
 
     agent_configs_json = [
-         {"node_id": 0,
-          "agent_type": CloudAgent,
+         {"node_id": 1,
+          "agent_type": ServiceLeaderAgent,
           "sleep_time": 500,  
-          "instructions_per_wakeup": 5*10*10**8,
+          "instructions_per_wakeup": 5*10**6,
           "agent_ipt_percentage": 0.5,
-          "observable_node_ids": [0,1],
+          "observable_node_ids": [0,1,2,3,4,5],
           "metrics": {"service_node_utilization":{"module":"yafs.management_network", 
                                                  "class":"ServiceNodeUtilization",
                                                  "post":{
@@ -394,20 +414,58 @@ def main(simulated_time):
           "actions": {"msg_instructions_pctl": {"module":"yafs.management_network", 
                                                 "class":"DiscretePercentileMessageInstructionsInterventions",
                                                 "params": {"pctls": [0.1, 0.3, 0.5, 0.7, 1.0]},
-                                               },
-                      "discrete_node_ipt": {"module":"yafs.management_network", 
+                                               }
+                     }
+         },
+         {"node_id": 3,
+          "agent_type": WorkerAgent,
+          "sleep_time": 500,  
+          "instructions_per_wakeup": 5*10**6,
+          "agent_ipt_percentage": 0.5,
+          "observable_node_ids": [3],
+          "metrics": {"service_node_utilization":{"module":"yafs.management_network", 
+                                                 "class":"ServiceNodeUtilization",
+                                                 "post":{
+                                                     "module":"yafs.management_network",
+                                                     "class":"PostDiscretize",
+                                                     "params":{
+                                                         "bins": [0,20,40,60,80,100]                                                           
+                                                     }
+                                                  }
+                                                 },
+                      "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
+                      "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
+                      "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
+                      "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
+                      "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
+                      "node_nominalwatt": {"module":"yafs.management_network", "class":"NodeNominalWatt"},
+                      "linear_cost_buyya": {"module":"yafs.management_network", 
+                                            "class":"LinearCostBuyya",
+                                            "params":{"cost_alpha": 1.0}
+                                            }
+                     },
+          "actions": {"discrete_node_ipt": {"module":"yafs.management_network", 
                                             "class":"DiscreteNodeIPTInterventions",
-                                            "params": {"iptl":[300*10**5, 1*10*10**8, 10*10*10**8, 100*10*10**8]},
+                                            "params": {"iptl":[10**5, 10**7]},
                                            },
                      }
          },
-         {"node_id": 1,
-          "agent_type": SensorAgent,
+         {"node_id": 4,
+          "agent_type": WorkerAgent,
           "sleep_time": 500,  
-          "instructions_per_wakeup": 10**8,
+          "instructions_per_wakeup": 5*10**6,
           "agent_ipt_percentage": 0.5,
-          "observable_node_ids": [1,2],
-          "metrics": {"service_node_utilization": {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
+          "observable_node_ids": [4],
+          "metrics": {"service_node_utilization":{"module":"yafs.management_network", 
+                                                 "class":"ServiceNodeUtilization",
+                                                 "post":{
+                                                     "module":"yafs.management_network",
+                                                     "class":"PostDiscretize",
+                                                     "params":{
+                                                         "bins": [0,20,40,60,80,100]                                                           
+                                                     }
+                                                  }
+                                                 },
                       "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
                       "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
                       "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
@@ -418,25 +476,11 @@ def main(simulated_time):
                                             "class":"LinearCostBuyya",
                                             "params":{"cost_alpha": 1.0}
                                             }
-                     }
-         },
-         {"node_id": 2,
-          "agent_type": ActuatorAgent,
-          "sleep_time": 500,  
-          "instructions_per_wakeup": 10*10*10**6,
-          "agent_ipt_percentage": 0.5,
-          "observable_node_ids": [2,0],
-          "metrics": {"service_node_utilization": {"module":"yafs.management_network", "class":"ServiceNodeUtilization"},
-                      "agent_node_utilization": {"module":"yafs.management_network", "class":"AgentNodeUtilization"},
-                      "node_average_waiting_time": {"module":"yafs.management_network", "class":"NodeAverageWaitingTime"},
-                      "node_request_waiting_in": {"module":"yafs.management_network", "class":"NodeRequestsWaitingIn"},
-                      "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
-                      "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
-                      "node_nominalwatt": {"module":"yafs.management_network", "class":"NodeNominalWatt"},
-                      "linear_cost_buyya": {"module":"yafs.management_network", 
-                                            "class":"LinearCostBuyya",
-                                            "params":{"cost_alpha": 1.0}
-                                            }
+                     },
+          "actions": {"discrete_node_ipt": {"module":"yafs.management_network", 
+                                            "class":"DiscreteNodeIPTInterventions",
+                                            "params": {"iptl":[10**5, 10**7]},
+                                           },
                      }
          }
     ]
@@ -451,10 +495,11 @@ def main(simulated_time):
     sim.run(stop_time, show_progress_monitor=False)  # To test deployments put test_initial_deploy a TRUE
     sim.print_debug_assignaments()
 
-    time_loops = [["M.A", "M.B"]]
+    time_loops = [["M1", "M2"]]
 
     from yafs.stats import Stats
-    mypath = "/home/ildefons/yaf310/examples/aif/results/sim_trace"
+    #mypath = "/home/ildefons/yaf310/examples/aif/results/sim_trace"
+    mypath = "/home/ildefons/yaf310/examples/ayafs/FederatedLearning/results/sim_trace"
 
     m = Stats(defaultPath=mypath)
     m.showResults2(simulated_time, time_loops=time_loops)
@@ -466,13 +511,14 @@ def main(simulated_time):
 
     print("\n\t- Stats of each service deployed -")
     print(m.get_df_modules())
-    print(m.get_df_service_utilization("ServiceA",simulated_time))
-    print(m.get_df_service_utilization("Camera",simulated_time))
+    print(m.get_df_service_utilization("ServiceLeader1",simulated_time))
+    print(m.get_df_service_utilization("ServiceLeader2",simulated_time))
+    print(m.get_df_service_utilization("Servicewoker",simulated_time))
     print(m.get_df_service_utilization("Dashboard",simulated_time))
 
     print("\n\t- Stats of each DEVICE -")
 
-    app_name = "SimpleCase"
+    app_name = "FederatedLearning"
     app = sim.apps[app_name]
     services = app.services
     
@@ -481,16 +527,6 @@ def main(simulated_time):
 
     print("\n\t- Stats of each management agent deployed -")
     print(m.get_df_agent_modules())
-
-    # for i in sim.management_network['management_network']['management_network'].agents.keys():
-    #     agent_name = sim.management_network['management_network']['management_network'].agents[i].agent_name
-    #     print("---------------------\n",agent_name)
-    #     print(m.get_df_agent_utilization(agent_name,simulated_time))
-    #     print(m.get_df_agent_sleeping_percentage(agent_name,simulated_time))
-        
-    #print(m.get_df_service_utilization("ServiceA",simulated_time))
-
-    # s.draw_allocated_topology() # for debugging
 
 
 
@@ -501,6 +537,6 @@ if __name__ == '__main__':
     logging.config.fileConfig(os.getcwd()+'/logging.ini')
 
     start_time = time.time()
-    main(simulated_time=25500)
+    main(simulated_time=10000)
 
     print("\n--- %s seconds ---" % (time.time() - start_time))
