@@ -72,7 +72,17 @@
 
 - (*) AIF Example (and future ones) to dedicated folder "/home/ildefons/yaf310/examples/ayafs"
 
-- (*) list of tests/examples ending on 2 active inference examples with pymdp and gp
+- (*, done) list of tests/examples ending on 2 active inference examples with pymdp and gp
     - (*, done) single node action (perception of time) loop: SingleAgentAPL
     - (*, done) single node action perception loop using active inference with pymdp: SingleAgentAPLPymdp
-    - (*, next) multiple agent federated learning example: FederatedLearning
+    - (*, done) multiple agent federated learning example: FederatedLearning
+
+# New tasks 2/10/2025:
+
+- (*) Think deploy/undeploy intervention interface
+
+- (*) Think unloading input buffer interface
+
+- (*) paper
+    - (*, next) Identify journal/conference venue
+    - (*, next) Write content in word doc
