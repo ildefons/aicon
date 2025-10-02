@@ -773,7 +773,7 @@ class DiscretePercentileMessageInstructionsInterventions(Intervention):
                 raise ValueError(f"Percentiles not monotonically increasing at index {i}: {p} < {pctls[i-1]}")
         self.pctls = pctls
 
-    def __call__(self, action_id, service_des_id):
+    def __call__(self, action_id, node_id):
         """
         applies intervention
         Args:
@@ -784,6 +784,12 @@ class DiscretePercentileMessageInstructionsInterventions(Intervention):
         if action_id >= len(self.pctls):
             raise ValueError(f"Parameter action_id must be less than {len(self.pctls)}, but got {action_id}")
     
+        service_des_id = None
+        try:
+            service_des_id = next(k for k, v in self.sim.alloc_DES.items() if v == node_id)
+        except StopIteration:
+            raise ValueError("node_id {node_id} does not seem to have a DES instance")
+
         des_pct_instructions_old = self.sim.des_pct_instructions[service_des_id]
         node_id = self.sim.alloc_DES[service_des_id]
    

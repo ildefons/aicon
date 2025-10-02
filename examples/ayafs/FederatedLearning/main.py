@@ -51,28 +51,16 @@ class ServiceLeaderAgent(ManagementAgent):
         wt3 = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == 3][0]['value']
         wt4 = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == 4][0]['value']
         print("wt3: ", wt3, ", wt4:", wt4)
-        
-        # if worker 1 + 2 (mean) wt > 500 and high qos, lower qos
 
-        # if worker 1 + 2 (mean) wt <= 500 and low qos, raise qos
-
-        # Motivaion: first the Leader tries to control wt by adjusting qos for all workers, if this fails, individual workers will raise/low locl ipt/resources
-        # Why: Goal try to see distributed control, oscilations, different regimes
-
-        # myactions2 = self.actions['discrete_node_ipt']
-        
-        # if self.sim.env.now >= 2000 and self.state_id == 0:
-        #     self.state_id = 1
-        #     myactions2(action_id=1, node_id=self.node_id)
-        # elif self.sim.env.now >= 4000 and self.state_id == 1:
-        #     self.state_id = 2
-        #     myactions2(action_id=0, node_id=self.node_id)
-        # elif self.state_id == 2:
-        #     sublist_metrics = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == self.node_id]
-        #     if sublist_metrics[0]['value'] > 550:
-        #         myactions2(action_id=1, node_id=self.node_id)  #We move to high performance
-        #     if sublist_metrics[0]['value'] < 200:
-        #         myactions2(action_id=0, node_id=self.node_id)  #We move to low performance          
+        myaction = self.actions['msg_instructions_pctl']
+               
+        if (wt3+wt4)/2 > 1000:
+            #nodeid_tobe_acted = random.choice([3,4])
+            myaction(action_id=3, node_id=3)
+            myaction(action_id=3, node_id=4)
+        if (wt3+wt4)/2 <= 1000:
+            myaction(action_id=4, node_id=3)
+            myaction(action_id=4, node_id=4)     
 
 
 class WorkerAgent(ManagementAgent):
@@ -81,11 +69,15 @@ class WorkerAgent(ManagementAgent):
 
         print("inside WorkerAgent")
         wt = [item for item in collected_metrics if item['metric'] == 'NodeAverageWaitingTime' and item['node_id'] == self.node_id][0]['value']
-        print("wt: ", wt)
+        ipt = [item for item in collected_metrics if item['metric'] == 'NodeIPT' and item['node_id'] == self.node_id][0]['value']
+        print("wt: ", wt, ", ipt:", ipt)
 
-        # if worker wt > 1000 and lower tier ipt, increase ipt
+        myactions = self.actions['discrete_node_ipt']
 
-        # if worker wt <= 1000 and high tier ipt, lower ipt
+        if wt > 2000 and ipt < 2*10**6:
+            myactions(action_id=1, node_id=self.node_id)
+        elif wt <= 2000 and ipt >= 2*10**6:
+            myactions(action_id=0, node_id=self.node_id)
 
         return []  # Extensible for future logic
 
@@ -240,8 +232,8 @@ def create_application():
                   ])
 
 
-    m_0 = Message("M0", "MinibatchCreator", "ServiceLeader1", instructions=20*10**5, bytes=1000, qos=LinearQoS(L=0.05,R=1.0))
-    m_1 = Message("M1", "ServiceLeader1", "ServiceWorker",instructions=20*10**5, bytes=1000)
+    m_0 = Message("M0", "MinibatchCreator", "ServiceLeader1", instructions=20*10**5, bytes=1000)
+    m_1 = Message("M1", "ServiceLeader1", "ServiceWorker",instructions=20*10**5, bytes=1000, qos=LinearQoS(L=0.05,R=1.0))
     m_2 = Message("M2", "ServiceWorker", "ServiceLeader2", instructions=20*10**5, bytes=1000)
     m_3 = Message("M3", "ServiceLeader2", "Dashboard", instructions=20*10**3, bytes=1000)
 
@@ -442,11 +434,12 @@ def main(simulated_time):
                       "linear_cost_buyya": {"module":"yafs.management_network", 
                                             "class":"LinearCostBuyya",
                                             "params":{"cost_alpha": 1.0}
-                                            }
+                                            },
+                      "node_ipt":{"module":"yafs.management_network","class":"NodeIPT"}
                      },
           "actions": {"discrete_node_ipt": {"module":"yafs.management_network", 
                                             "class":"DiscreteNodeIPTInterventions",
-                                            "params": {"iptl":[10**5, 10**7]},
+                                            "params": {"iptl":[10*10**5, 30*10**6]},
                                            },
                      }
          },
@@ -475,11 +468,12 @@ def main(simulated_time):
                       "linear_cost_buyya": {"module":"yafs.management_network", 
                                             "class":"LinearCostBuyya",
                                             "params":{"cost_alpha": 1.0}
-                                            }
+                                            },
+                      "node_ipt":{"module":"yafs.management_network","class":"NodeIPT"}
                      },
           "actions": {"discrete_node_ipt": {"module":"yafs.management_network", 
                                             "class":"DiscreteNodeIPTInterventions",
-                                            "params": {"iptl":[10**5, 10**7]},
+                                            "params": {"iptl":[10*10**5, 30*10**6]},
                                            },
                      }
          }
