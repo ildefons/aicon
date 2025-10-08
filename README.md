@@ -18,6 +18,5 @@ python main.py
 
 ## Acknowledgment
 
-This framework builds upon [YAFS (Yet Another Fog Simulator)](https://github.com/acsicuib/YAFS).  
-We acknowledge and thank the YAFS authors for their foundational work in fog computing simulation, which our project extends to support the study and development of distributed management agents for continuum computing systems.
+This framework builds upon [YAFS (Yet Another Fog Simulator)](https://github.com/acsicuib/YAFS). We acknowledge and thank the YAFS authors for their foundational work in fog computing simulation, which our project extends to support the study and development of distributed management agents for continuum computing systems.
 
