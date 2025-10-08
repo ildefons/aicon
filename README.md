@@ -9,7 +9,9 @@ create conda environment with python 3.10
 pip install ./requirements.txt
 ```
 
-2) The ```examples\ayafs``` directory contain three examples with both a simulated setup and management network meant to control this simulated system. Other folders in ```examples``` contains uniquelly examples of simulated setups and we cannot guarantee the correct functionality due to heavy changes performed in the underlying simulator based on YAFS (see Acknowledgement below) and the same caution note applies to the ```tutorial_scenarios``` folder
+2) Examples
+
+The ```examples\ayafs``` directory contain three examples with both a simulated setup and management network meant to control this simulated system. Other folders in ```examples``` contains uniquelly examples of simulated setups and we cannot guarantee the correct functionality due to heavy changes performed in the underlying simulator based on YAFS (see Acknowledgement below) and the same caution note applies to the ```tutorial_scenarios``` folder
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:~/YAFS/src/
