@@ -1,6 +1,6 @@
 
 # AICon (Agentic Intelligence for the Computing Continuum) 
-### A simulator based developement framework of distributed management agents for continuum computing systems
+### A simulator based developement framework of distributed management agents for the computing continuum
 
 1) Installation
 
