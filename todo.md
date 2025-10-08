@@ -81,7 +81,7 @@
 
 - (*) Think deploy/undeploy intervention interface
 
-- (*) Think unloading input buffer interface
+- (*) Think offloading input buffer interface (use FL example to offload between workers)
 
 - (*) paper
     - (*, next) Identify journal/conference venue

@@ -3,16 +3,16 @@ from setuptools import setup, find_packages
 
 #python setup.py sdist upload
 setup(
-    name='yafs',
-    version='0.3.0',
-    author='Isaac Lera, Carlos Guerrero',
-    author_email='isaac.lera@uib.es, carlos.guerrero@ouib.es',
-    description='Yet Another Fog Simulator for Python.',
+    name='Agentarium',
+    version='0.1.0',
+    author='Ildefons Magrans de Abril',
+    author_email='ildefons.magrans@gmail.com',
+    description='Development environment with simulator back-end to facilitate the development multi agent control system for continuum computing systems.',
     long_description='\n\n'.join(
         open(f, 'rb').read().decode('utf-8')
         for f in ['README.md', 'CHANGELOG.md', 'AUTHORS.txt']),
     url='https://yafs.readthedocs.io',
-    license='MIT License',
+    license='modified MIT-style license with a non-commercial restriction',
     #packages=find_packages(where='src',exclude=("*.tests",)),
     packages=find_packages(where='src',exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
     package_dir={'': 'src'},
@@ -36,3 +36,4 @@ setup(
         'Topic :: Scientific/Engineering',
     ],
 )
+
