@@ -3,15 +3,15 @@ from setuptools import setup, find_packages
 
 #python setup.py sdist upload
 setup(
-    name='Agentarium',
+    name='AICon',
     version='0.1.0',
     author='Ildefons Magrans de Abril',
     author_email='ildefons.magrans@gmail.com',
-    description='Development environment with simulator back-end to facilitate the development multi agent control system for continuum computing systems.',
+    description='A simulator based developement framework of distributed management agents for the computing continuum.',
     long_description='\n\n'.join(
         open(f, 'rb').read().decode('utf-8')
         for f in ['README.md', 'CHANGELOG.md', 'AUTHORS.txt']),
-    url='https://yafs.readthedocs.io',
+    url='https://github.com/ildefons/aicon',
     license='modified MIT-style license with a non-commercial restriction',
     #packages=find_packages(where='src',exclude=("*.tests",)),
     packages=find_packages(where='src',exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),

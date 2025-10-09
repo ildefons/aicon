@@ -123,7 +123,7 @@ class ManagementAgent:
             #print("------------------>duration_previous_cycle:",duration_previous_cycle)
             collected_metrics = self.collect_metrics(duration_previous_cycle) # we pass the time spent in previous cycle so it can compute the metrics
             self.last_time_agent_start_processing = time_sleep_end # update for next iteration
-            self.agent_behavior(collected_metrics)   # main method to be customized
+            # BEFORE: self.agent_behavior(collected_metrics)   # main method to be customized
 
             #Compute time working as self.instructions_per_wakeup/float(node["IPT"])  
             att_node = self.sim.topology.G.nodes[self.node_id]
@@ -132,7 +132,9 @@ class ManagementAgent:
             
             #Simulate agent' time of service
             yield self.sim.env.timeout(self.time_of_service) # Work 
-            time_processing_end = self.sim.env.now           
+            time_processing_end = self.sim.env.now       
+
+            self.agent_behavior(collected_metrics)   # main method to be customized    
 
             #Update agent metrics
             self.sim.metrics.insert_agent_step({

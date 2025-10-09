@@ -79,9 +79,13 @@
 
 # New tasks 2/10/2025:
 
+- (*, done) currently the simulated time of the agent behavior cycle is triggered before than the actual agent behavior cycle. It would be more semantically correct to first yield the simulated time of the agent behavior cycle and then run the actual agent behavior for this cycle because otherwise eventually some consequances of the agent interventions could occur at a simulated time before the agent has ended at simulated time. 
+
 - (*) Think deploy/undeploy intervention interface
 
 - (*) Think offloading input buffer interface (use FL example to offload between workers)
+
+- (*) Design customizable condition to the wakeup and behavior execution of the agent s.t. the agent core initially only collect metrics essential to compute the "wakeup condition" and only if this condition if fullfilled the agent core collect the rest of metrics and execute the periodic agent bahvior. This feature would align with S concern about not having an event-based wake up and would alleviate the scalability overload of having to collect all metrics for all agents every wake up cycle 
 
 - (*) paper
     - (*, next) Identify journal/conference venue
