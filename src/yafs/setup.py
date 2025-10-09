@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 #python setup.py sdist upload
 setup(
     name='AICon',
-    version='0.1.0',
+    version='1.0.0',
     author='Ildefons Magrans de Abril',
     author_email='ildefons.magrans@gmail.com',
     description='A simulator based developement framework of distributed management agents for the computing continuum.',

@@ -6,6 +6,7 @@
 
 ```bash
 create conda environment with python 3.10
+git clone --branch v1.0.0 https://github.com/ildefons/aicon.git
 pip install ./requirements.txt
 ```
 
