@@ -549,6 +549,43 @@ class NodeRequestsWaitingIn(Metric):
         
         return results       
 
+class NodeQoS(Metric):
+
+    def __init__(self, agent):
+        super().__init__()
+        self.agent = agent
+    
+    def _call_impl(self):
+
+        """
+        Returns QoS delivered by application module instances running in a node 
+        (note: BTB only 1 app service per node, so is the same a sevice~node) 
+
+        args: app_filtered_df
+        """
+
+        df = self.agent.app_filtered_df
+        
+        value = 0
+        results = []
+
+        for id in self.agent.observable_node_ids:
+            value = 0.0
+            if df is None or not isinstance(df, pd.DataFrame):
+                value = None
+            else:
+                df2 = df[df["TOPO.dst"]==id]
+                if df2.shape[0] > 0:
+                    value = df2['qos'].mean()
+                else:
+                    value = None
+            results.append({
+                "metric": self.__class__.__name__,
+                "node_id": id,
+                "value": value
+                })
+        
+        return results       
 
 class NodeRequestsOut(Metric):
 
@@ -704,9 +741,9 @@ class LinearCostBuyya(Metric):
                     instructions_per_wakeup
 
             results.append({"metric": self.__class__.__name__,
-                "node_id": id,
-                "value": value
-                })
+                            "node_id": id,
+                            "value": value
+                            })
         
         return results
 

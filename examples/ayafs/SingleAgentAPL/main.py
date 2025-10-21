@@ -364,6 +364,7 @@ def main(simulated_time):
                       "node_requests_out": {"module":"yafs.management_network", "class":"NodeRequestsOut"},
                       "net_buffer_size": {"module":"yafs.management_network", "class":"NetBufferSize"},
                       "node_nominalwatt": {"module":"yafs.management_network", "class":"NodeNominalWatt"},
+                      "node_qos": {"module":"yafs.management_network", "class":"NodeQoS"},
                       "linear_cost_buyya": {"module":"yafs.management_network", 
                                             "class":"LinearCostBuyya",
                                             "params":{"cost_alpha": 1.0}
