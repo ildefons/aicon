@@ -20,6 +20,10 @@ cd examples/ayafs/SingleAgentAPL
 python main.py
 ```
 
+## References
+ * Ildefons Magrans de Abril, Nefeli-Marina Rouska, Victor Casamayor, Schahram Dustdar, <A href="https://ieeexplore.ieee.org/document/11411901">iAICon: Agentic Intelligence for the Computing Continuum</A>, IEEE Internet Computing, Volume 29, Issue: 6, DOI: 10.1109/MIC.2025.3645964, Nov.-Dec.-2025.
+
+
 ## Acknowledgment
 
 This framework builds upon [YAFS (Yet Another Fog Simulator)](https://github.com/acsicuib/YAFS). We acknowledge and thank the YAFS authors for their foundational work in fog computing simulation, which our project extends to support the study and development of distributed management agents for continuum computing systems.
