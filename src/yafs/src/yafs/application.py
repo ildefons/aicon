@@ -3,6 +3,9 @@ import random
 
 import math
 
+import copy
+from numbers import Number
+
 # ILDE: QoS related code
 class LinearQoS:
     def __init__(self, L: float, R: float): # R_inst is the number of instructions corresponding to R
@@ -200,7 +203,16 @@ class Message:
         self.name = name
         self.src = src
         self.dst = dst
-        self.inst = instructions
+
+        #BEGINILDE (PRAISE)
+        #self.inst = instructions
+        self.instructions = instructions
+        if isinstance(instructions, Number):
+            self.inst = instructions
+        else:
+            self.inst = None
+        #ENDILDE (PRAISE)
+
         self.bytes = bytes
 
         self.timestamp = 0
@@ -225,6 +237,18 @@ class Message:
         print (" From (src): %s  to (dst): %s" %(self.src,self.dst))
         print (" --}")
         return ("")
+
+    # BEGINILDE(PRAISE): necessary to allow "instructions" to be a distribution
+    def instantiate(self):
+        msg = copy.copy(self)
+
+        if isinstance(self.instructions, Number):
+            msg.inst = self.instructions
+        else:
+            msg.inst = self.instructions.next()
+
+        return msg
+    # ENDILDE(PRAISE)
 
 def fractional_selectivity(threshold):
     return random.random() <= threshold

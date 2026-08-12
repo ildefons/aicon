@@ -217,6 +217,7 @@ class Sim:
                 # print "MESSAGES"
                 #May be, the selector of path decides broadcasting multiples paths
                 for idx,path in enumerate(paths):
+                    # ILDE PRAISE COMMENT: we dont change it for "msg = message.instantiate()" bc is already a realized runtime message. YAFS is only creating a routing/path copy, potentially because the selector returned several paths 
                     msg = copy.copy(message)
                     # if message.name=="M.A":
                     #     print(1)
@@ -413,7 +414,12 @@ class Sim:
                 #print("HELO---->",self.env.now)
                 # if message.name == 'M.A':
                 #     print(1)
-                msg = copy.copy(message)
+
+                #ILDEBEGINE PRAISE
+                #msg = copy.copy(message)
+                msg = message.instantiate()
+                #ILDEEND
+
                 msg.timestamp = self.env.now
                 msg.id = self.__getIDMessage()
                 msg.original_DES_src = idDES
@@ -616,7 +622,12 @@ class Sim:
             if self.des_process_running[idDES]:
                 self.logger.debug(
                     "(App:%s#DES:%i#%s)\tModule - Generating Message:\t%s" % (app_name, idDES, module, message.name))
-                msg = copy.copy(message)
+
+                # ILDEBEGIN PRAISE
+                #msg = copy.copy(message)
+                msg = message.instantiate()
+                # ILDEEND
+                
                 if message.name=="M.A":
                     print(1)
                 msg.timestamp = self.env.now
@@ -705,7 +716,11 @@ class Sim:
                                     self.logger.debug("(App:%s#DES:%i#%s)\tModule - Transmit Message:\t%s" % (
                                         app_name, ides, module, register["message_out"].name))
 
-                                    msg_out = copy.copy(register["message_out"])
+                                    # ILDEBEGIN PRAISE
+                                    #msg_out = copy.copy(register["message_out"])
+                                    msg_out = register["message_out"].instantiate()
+                                    # ILDEEND
+
                                     msg_out.timestamp = self.env.now
                                     msg_out.id = msg.id
                                     msg_out.last_idDes = copy.copy(msg.last_idDes)
@@ -719,7 +734,11 @@ class Sim:
                                     self.logger.debug("(App:%s#DES:%i#%s)\tModule - Broadcasting Message:\t%s" % (
                                         app_name, ides, module, register["message_out"].name))
 
-                                    msg_out = copy.copy(register["message_out"])
+                                    # ILDEBEGIN PRAISE
+                                    #msg_out = copy.copy(register["message_out"])
+                                    msg_out = register["message_out"].instantiate()
+                                    # ILDEEND
+
                                     msg_out.timestamp = self.env.now
                                     msg_out.last_idDes = copy.copy(msg.last_idDes)
                                     msg_out.id = msg.id
