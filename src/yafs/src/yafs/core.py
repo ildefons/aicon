@@ -631,6 +631,11 @@ class Sim:
                 if message.name=="M.A":
                     print(1)
                 msg.timestamp = self.env.now
+
+                # ILDEBEGIN PRAISE: every newly originated logical request gets a unique ID
+                msg.id = self.__getIDMessage()
+                # ILDEEND
+
                 msg.original_DES_src = idDES
 
                 self.__send_message(app_name, msg, idDES,self.SOURCE_METRIC)
