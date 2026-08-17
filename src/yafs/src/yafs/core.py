@@ -728,6 +728,11 @@ class Sim:
 
                                     msg_out.timestamp = self.env.now
                                     msg_out.id = msg.id
+
+                                    # ILDEBEGIN PRAISE: preserve active composition context
+                                    msg_out.composition_path = msg.composition_path
+                                    # ILDEEND
+
                                     msg_out.last_idDes = copy.copy(msg.last_idDes)
                                     msg_out.last_idDes.append(ides)
 
@@ -747,6 +752,11 @@ class Sim:
                                     msg_out.timestamp = self.env.now
                                     msg_out.last_idDes = copy.copy(msg.last_idDes)
                                     msg_out.id = msg.id
+
+                                    # ILDEBEGIN PRAISE: preserve active composition context
+                                    msg_out.composition_path = msg.composition_path
+                                    # ILDEEND           
+
                                     msg_out.last_idDes = msg.last_idDes.append(ides)
                                     for idx, module_dst in enumerate(register["module_dest"]):
                                         if random.random() <= register["p"][idx]:

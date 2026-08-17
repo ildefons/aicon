@@ -226,6 +226,11 @@ class Message:
         self.last_idDes = []
         self.id = -1
 
+        # ILDEBEGIN PRAISE: active nested composition context
+        # Immutable tuple of (composition_id, branch_id) frames.
+        self.composition_path = ()
+        # ILDEEND
+
         self.original_DES_src = None #This attribute identifies the user when multiple users are in the same node
 
         #ILDE: QoS related code
