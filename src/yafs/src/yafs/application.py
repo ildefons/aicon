@@ -435,7 +435,6 @@ class Application:
             module_dest (list): a list of modules who can receive this message. Broadcasting.
 
             p (list): a list of probabilities to send this message. Broadcasting
-
         Kwargs:
             param_distribution (dict): the parameters for *distribution* function
 
@@ -448,6 +447,7 @@ class Application:
                  "message_out": message, "module_dest": module_dest, "p": p})
 
     def add_service_module(self, module_name, message_in, message_out="", distribution="", module_dest=[], p=[],
+                           composition_push=None, # ILDE-PRAISE
                            **param):
 
         """
@@ -466,6 +466,8 @@ class Application:
 
             p (list): a list of probabilities to send this message. Broadcasting
 
+            composition_push: Optional tuple PRAISE metadata: append (composition_id, branch_id) to outgoing message context.
+
         Kwargs:
             param (dict): the parameters for *distribution* function
 
@@ -475,4 +477,5 @@ class Application:
 
         self.services[module_name].append({"type": Application.TYPE_MODULE, "dist": distribution, "param": param,
                                            "message_in": message_in, "message_out": message_out,
-                                           "module_dest": module_dest, "p": p})
+                                           "module_dest": module_dest, "p": p,
+                                           "composition_push": composition_push})

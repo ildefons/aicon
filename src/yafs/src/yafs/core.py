@@ -731,6 +731,11 @@ class Sim:
 
                                     # ILDEBEGIN PRAISE: preserve active composition context
                                     msg_out.composition_path = msg.composition_path
+                                    composition_push = register.get("composition_push")
+                                    if composition_push is not None:
+                                        msg_out.composition_path = (
+                                            msg_out.composition_path + (composition_push,)
+                                        )
                                     # ILDEEND
 
                                     msg_out.last_idDes = copy.copy(msg.last_idDes)
@@ -1209,7 +1214,9 @@ class Sim:
                 # 1 module puede consumir N type de messages con diferentes funciones de distribucion
                 register_consumer_msg.append(
                     {"message_in": service["message_in"], "message_out": service["message_out"],
-                     "module_dest": service["module_dest"], "dist": service["dist"], "param": service["param"]})
+                     "module_dest": service["module_dest"], "dist": service["dist"], "param": service["param"],
+                     # ILDE-PRAISE: preserve composition metadata during deployment
+                     "composition_push": service.get("composition_push")})
 
 
         if len(register_consumer_msg) > 0:
