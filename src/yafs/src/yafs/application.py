@@ -479,3 +479,65 @@ class Application:
                                            "message_in": message_in, "message_out": message_out,
                                            "module_dest": module_dest, "p": p,
                                            "composition_push": composition_push})
+
+
+    def add_service_module_praise(
+        self,
+        module_name,
+        message_in,
+        message_out="",
+        distribution="",
+        module_dest=[],
+        p=[],
+        *,
+        composition_id,
+        branch_id,
+        depends_on=(),
+        **param):
+
+        """
+        Register a PRAISE composition branch.
+
+        Args:
+            module_name (str): module name
+
+            message_in (Message): input message
+
+            message_out (Message): output message. If empty, the module is a sink
+
+            distribution (function): output/selectivity function
+
+            module_dest (list): broadcasting destinations
+
+            p (list): broadcasting probabilities
+
+            composition_id: identifier of the enclosing composition
+
+            branch_id: identifier of this branch within the composition
+
+            depends_on: branch IDs that must complete before this branch may activate
+
+        Kwargs:
+            param (dict): parameters for the distribution function
+        """
+
+        if module_name not in self.services:
+            self.services[module_name] = []
+
+        self.services[module_name].append({
+            "type": Application.TYPE_MODULE,
+            "dist": distribution,
+            "param": param,
+            "message_in": message_in,
+            "message_out": message_out,
+            "module_dest": module_dest,
+            "p": p,
+
+            # ILDE-PRAISE: static composition semantics
+            "composition_id": composition_id,
+            "branch_id": branch_id,
+            "depends_on": tuple(depends_on),
+
+            # Runtime context frame to push when this branch activates
+            "composition_push": (composition_id, branch_id)
+        })
