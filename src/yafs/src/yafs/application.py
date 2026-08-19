@@ -312,6 +312,10 @@ class Application:
     def __init__(self, name):
         self.name = name
         self.services = {}
+
+        # ILDE-PRAISE: static composition specifications indexed by composition_id
+        self.compositions = {}
+
         self.messages = {}
         self.modules = []
         self.modules_src = []
@@ -524,7 +528,39 @@ class Application:
         if module_name not in self.services:
             self.services[module_name] = []
 
-        self.services[module_name].append({
+        depends_on = tuple(depends_on)
+
+        if composition_id not in self.compositions:
+            self.compositions[composition_id] = {
+                "origin_module": module_name,
+                "message_in": message_in,
+                "controller_name": "__PRAISE_JOIN__%s" % composition_id,
+                "branches": {}
+            }
+        else:
+            composition = self.compositions[composition_id]
+
+            if composition["origin_module"] != module_name:
+                raise ValueError(
+                    "PRAISE composition %s has inconsistent origin modules"
+                    % composition_id
+                )
+
+            if composition["message_in"].name != message_in.name:
+                raise ValueError(
+                    "PRAISE composition %s has inconsistent input messages"
+                    % composition_id
+                )
+
+        branches = self.compositions[composition_id]["branches"]
+
+        if branch_id in branches:
+            raise ValueError(
+                "Duplicate branch_id %s in PRAISE composition %s"
+                % (branch_id, composition_id)
+            )
+
+        registration = {
             "type": Application.TYPE_MODULE,
             "dist": distribution,
             "param": param,
@@ -536,8 +572,11 @@ class Application:
             # ILDE-PRAISE: static composition semantics
             "composition_id": composition_id,
             "branch_id": branch_id,
-            "depends_on": tuple(depends_on),
+            "depends_on": depends_on,
 
             # Runtime context frame to push when this branch activates
             "composition_push": (composition_id, branch_id)
-        })
+        }
+
+        self.services[module_name].append(registration)
+        branches[branch_id] = registration

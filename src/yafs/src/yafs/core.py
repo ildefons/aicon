@@ -178,6 +178,12 @@ class Sim:
         # edge -> last_use_channel (float) = Simulation time
 
 
+        # ILDE-PRAISE: runtime composition/join controllers
+        self.composition_controllers = {}
+
+        # DES processes used internally by PRAISE control logic
+        self.internal_control_DES = set()
+
 
     # self.__send_message(app_name, message, idDES, self.SOURCE_METRIC)
     def __send_message(self, app_name, message, idDES, type):
@@ -773,6 +779,39 @@ class Sim:
 
         self.logger.debug("STOP_Process - Module Consumer: %s\t#DES:%i" % (module, ides))
 
+
+    def __add_composition_controller(
+            self,
+            ides,
+            app_name,
+            composition_id,
+            controller_name):
+
+        """
+        ILDE-PRAISE:
+        Internal DES process associated with one composition join/controller.
+
+        At this checkpoint it is intentionally inert: it only waits for
+        incoming messages. Synchronization semantics are added later.
+        """
+
+        self.logger.debug(
+            "Added_Process - PRAISE Composition Controller: %s\t#DES:%i"
+            % (composition_id, ides)
+        )
+
+        pipe_id = "%s%s%i" % (
+            app_name,
+            controller_name,
+            ides
+        )
+
+        while not self.stop and self.des_process_running[ides]:
+            msg = yield self.consumer_pipes[pipe_id].get()
+
+            # Nothing else yet.
+
+
     def __add_sink_module(self, ides, app_name, module):
         """
         It generates a DES process associated to a SINK module
@@ -993,6 +1032,84 @@ class Sim:
         return idDES
 
 
+    def __deploy_composition_controller(
+            self,
+            app_name,
+            composition_id,
+            composition):
+
+        """
+        ILDE-PRAISE:
+        Deploy one internal DES join/controller for a composition.
+        """
+
+        origin_module = composition["origin_module"]
+        controller_name = composition["controller_name"]
+
+        origin_des = self.alloc_module[app_name][origin_module]
+
+        if len(origin_des) != 1:
+            raise ValueError(
+                "PRAISE composition %s requires exactly one deployment "
+                "of origin module %s"
+                % (composition_id, origin_module)
+            )
+
+        # Initial implementation policy:
+        # the composition controller is colocated with its origin module.
+        node_id = self.alloc_DES[origin_des[0]]
+
+        idDES = self.__get_id_process()
+        self.des_process_running[idDES] = True
+
+        # Give the controller its own normal YAFS input queue.
+        self.__add_consumer_service_pipe(
+            app_name,
+            controller_name,
+            idDES
+        )
+
+        # Give it a physical topology location.
+        self.alloc_DES[idDES] = node_id
+
+        # Register it so normal YAFS routing can eventually address it.
+        if controller_name not in self.alloc_module[app_name]:
+            self.alloc_module[app_name][controller_name] = []
+
+        self.alloc_module[app_name][controller_name].append(idDES)
+
+        # Mark it explicitly as internal control, not application compute.
+        self.internal_control_DES.add(idDES)
+
+        self.composition_controllers[
+            (app_name, composition_id)
+        ] = {
+            "des_id": idDES,
+            "node_id": node_id,
+            "controller_name": controller_name,
+            "pending": {}
+        }
+
+        self.env.process(
+            self.__add_composition_controller(
+                idDES,
+                app_name,
+                composition_id,
+                controller_name
+            )
+        )
+
+        # print(
+        #     "PRAISE_CONTROLLER_DEPLOYED",
+        #     "composition=", composition_id,
+        #     "controller=", controller_name,
+        #     "DES=", idDES,
+        #     "node=", node_id
+        # )
+
+        return idDES
+
+
     def deploy_sink(self, app_name, node, module):
         """
         Add a DES process for deploy pure SINK modules (actuators)
@@ -1178,11 +1295,25 @@ class Sim:
             # print "Module (SRC): %s(%s) - deployed at entity.id: %s" %(src_deployed["module"],src_deployed["app"],src_deployed["id"])
             alloc_entities[src_deployed["id"]].append(str(src_deployed["app"])+"#"+src_deployed["module"])
 
+        # for app in self.alloc_module:
+        #     for module in self.alloc_module[app]:
+        #         # print "Module (MOD): %s(%s) - deployed at entities.id: %s" % (module,app,self.alloc_module[app][module])
+        #         for idDES in self.alloc_module[app][module]:
+        #             alloc_entities[self.alloc_DES[idDES]].append(str(app)+"#"+str(module))
+
         for app in self.alloc_module:
             for module in self.alloc_module[app]:
-                # print "Module (MOD): %s(%s) - deployed at entities.id: %s" % (module,app,self.alloc_module[app][module])
                 for idDES in self.alloc_module[app][module]:
-                    alloc_entities[self.alloc_DES[idDES]].append(str(app)+"#"+str(module))
+
+                    # ILDE-PRAISE:
+                    # internal composition controllers do not consume
+                    # application compute capacity.
+                    if idDES in self.internal_control_DES:
+                        continue
+
+                    alloc_entities[self.alloc_DES[idDES]].append(
+                        str(app)+"#"+str(module)
+                    )
 
         return alloc_entities
 
@@ -1352,6 +1483,20 @@ class Sim:
         for place in self.placement_policy.items():
             for app_name in place[1]["apps"]:
                 place[1]["placement_policy"].initial_allocation(self, app_name)  # internally consideres the apps in charge
+
+
+        """
+        ILDE-PRAISE:
+        Deploy composition controllers after ordinary service placement,
+        so the physical location of each composition origin is known.
+        """
+        for app_name, app in self.apps.items():
+            for composition_id, composition in app.compositions.items():
+                self.__deploy_composition_controller(
+                    app_name,
+                    composition_id,
+                    composition
+                )
 
 
         """
