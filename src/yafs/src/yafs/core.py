@@ -15,7 +15,7 @@ import warnings
 import random
 
 from yafs.topology import Topology
-from yafs.application import Application
+from yafs.application import Application, Message
 from yafs.metrics import Metrics
 from yafs.metrics_online import Metrics_online
 from yafs.distribution import *
@@ -678,7 +678,22 @@ class Sim:
 
                 # print "Registers len: %i" %len(register_consumer_msg)
                 doBefore = False
-                #print(4,self.env.now)
+
+                # ILDE-PRAISE:
+                # Determine whether this execution is terminal for this input message.
+                # Completion must be emitted once per branch execution, not once per
+                # matching service registration.
+                matching_registers = [
+                    register
+                    for register in register_consumer_msg
+                    if msg.name == register["message_in"].name
+                ]
+
+                has_normal_output = any(
+                    bool(register["message_out"])
+                    for register in matching_registers
+                )
+
                 for register in register_consumer_msg:
                     #print(5, self.env.now)
                     if msg.name == register["message_in"].name:
@@ -777,6 +792,67 @@ class Sim:
                                 self.logger.debug("(App:%s#DES:%i#%s)\tModule - Stopped Message:\t%s" % (
                                     app_name, ides, module, register["message_out"].name))
 
+                # ILDE-PRAISE:
+                # If this message has just completed a terminal branch, notify
+                # the controller of the innermost active composition.
+                if (
+                        matching_registers
+                        and not has_normal_output
+                        and msg.composition_path
+                ):
+
+                    composition_id, branch_id = msg.composition_path[-1]
+
+                    composition = self.apps[app_name].compositions.get(
+                        composition_id
+                    )
+
+                    if composition is None:
+                        raise ValueError(
+                            "PRAISE message refers to unknown composition %s"
+                            % composition_id
+                        )
+
+                    if branch_id not in composition["branches"]:
+                        raise ValueError(
+                            "PRAISE message refers to unknown branch %s "
+                            "of composition %s"
+                            % (branch_id, composition_id)
+                        )
+
+                    controller_name = composition["controller_name"]
+
+                    completion = Message(
+                        "__PRAISE_COMPLETE__%s__%s"
+                        % (composition_id, branch_id),
+                        module,
+                        controller_name,
+                        instructions=0,
+                        bytes=0
+                    )
+
+                    # Preserve root request identity.
+                    completion.id = msg.id
+
+                    # Preserve the complete active composition context.
+                    completion.composition_path = msg.composition_path
+
+                    # The completion notification is emitted when the terminal
+                    # service has actually finished.
+                    completion.timestamp = self.env.now
+
+                    completion.original_DES_src = msg.original_DES_src
+
+                    completion.last_idDes = copy.copy(msg.last_idDes)
+                    completion.last_idDes.append(ides)
+
+                    self.__send_message(
+                        app_name,
+                        completion,
+                        ides,
+                        self.FORWARD_METRIC
+                    )
+
         self.logger.debug("STOP_Process - Module Consumer: %s\t#DES:%i" % (module, ides))
 
 
@@ -808,6 +884,7 @@ class Sim:
 
         while not self.stop and self.des_process_running[ides]:
             msg = yield self.consumer_pipes[pipe_id].get()
+
 
             # Nothing else yet.
 
