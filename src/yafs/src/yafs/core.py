@@ -882,11 +882,87 @@ class Sim:
             ides
         )
 
+        # ILDE-PRAISE:
+        # Expected branches come directly from the static composition
+        # specification. They are not declared independently by the join.
+        composition = self.apps[app_name].compositions[composition_id]
+
+        expected_branches = frozenset(
+            composition["branches"].keys()
+        )
+
+        controller = self.composition_controllers[
+            (app_name, composition_id)
+        ]
+
+        pending = controller["pending"]
+
         while not self.stop and self.des_process_running[ides]:
+
             msg = yield self.consumer_pipes[pipe_id].get()
 
+            # A completion notification must still carry the active branch frame.
+            if not msg.composition_path:
+                raise ValueError(
+                    "PRAISE completion received without composition context"
+                )
 
-            # Nothing else yet.
+            msg_composition_id, branch_id = msg.composition_path[-1]
+
+            # Make sure the message reached the correct controller.
+            if msg_composition_id != composition_id:
+                raise ValueError(
+                    "PRAISE completion for composition %s delivered to controller %s"
+                    % (msg_composition_id, composition_id)
+                )
+
+            if branch_id not in expected_branches:
+                raise ValueError(
+                    "Unknown branch %s received by PRAISE composition %s"
+                    % (branch_id, composition_id)
+                )
+
+            # Remove only the current composition frame.
+            # For a top-level F1 this is ().
+            # For a nested composition this preserves the parent's context.
+            parent_path = msg.composition_path[:-1]
+
+            # Requests must never be mixed, even if later requests overtake
+            # earlier ones in different branches.
+            key = (
+                msg.id,
+                parent_path
+            )
+
+            if key not in pending:
+                pending[key] = {}
+
+            # Our current grammar contains no retries or duplicated branch
+            # completions, so receiving the same branch twice is an error.
+            if branch_id in pending[key]:
+                raise ValueError(
+                    "Duplicate PRAISE branch completion: "
+                    "composition=%s request=%s branch=%s parent_path=%s"
+                    % (
+                        composition_id,
+                        msg.id,
+                        branch_id,
+                        parent_path
+                    )
+                )
+
+            # Keep the actual completion message, not merely the branch ID.
+            pending[key][branch_id] = msg
+
+            received_branches = set(
+                pending[key].keys()
+            )
+
+            if received_branches == expected_branches:
+
+                # This invocation of the composition is finished.
+                # Do not retain stale state.
+                del pending[key]
 
 
     def __add_sink_module(self, ides, app_name, module):
