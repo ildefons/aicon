@@ -496,7 +496,7 @@ class Application:
         *,
         composition_id,
         branch_id,
-        depends_on=(),
+        depends_on = (),
         **param):
 
         """
@@ -519,16 +519,34 @@ class Application:
 
             branch_id: identifier of this branch within the composition
 
-            depends_on: branch IDs that must complete before this branch may activate
+            depends_on: sibling branch IDs that must complete before this branch
+                        may activate. This is a completion-based activation
+                        dependency, not a success/failure-conditioned dependency.
 
         Kwargs:
             param (dict): parameters for the distribution function
         """
 
-        if module_name not in self.services:
-            self.services[module_name] = []
 
+        
+
+        # ILDE-PRAISE:
+        # depends_on expresses completion-based activation dependencies only.
+        # It does NOT currently represent success/failure-conditioned control.
+        # Choice, fallback and retry semantics are intentionally deferred.
         depends_on = tuple(depends_on)
+
+        if len(depends_on) != len(set(depends_on)):
+            raise ValueError(
+                "Duplicate dependencies for branch %s in PRAISE composition %s"
+                % (branch_id, composition_id)
+            )
+
+        if branch_id in depends_on:
+            raise ValueError(
+                "Branch %s cannot depend on itself in PRAISE composition %s"
+                % (branch_id, composition_id)
+            )
 
         if composition_id not in self.compositions:
             self.compositions[composition_id] = {
@@ -539,6 +557,12 @@ class Application:
             }
         else:
             composition = self.compositions[composition_id]
+
+            if "message_out" in composition:
+                raise ValueError(
+                    "Cannot add branch %s to closed PRAISE composition %s"
+                    % (branch_id, composition_id)
+                )
 
             if composition["origin_module"] != module_name:
                 raise ValueError(
@@ -560,6 +584,56 @@ class Application:
                 % (branch_id, composition_id)
             )
 
+        # ILDE-PRAISE:
+        # Incremental cycle check.
+        #
+        # Existing dependencies define edges:
+        #
+        #     dependency -> dependent branch
+        #
+        # Adding dependency d to the new branch b adds edge d -> b.
+        # Because the previously accepted graph is already acyclic, this creates
+        # a cycle iff there is already a path b -> d.
+        #
+        # Forward references are deliberately allowed: a dependency may name a
+        # branch that will be declared later.
+
+        dependency_graph = {}
+
+        for existing_branch_id, existing_registration in branches.items():
+
+            dependency_graph.setdefault(existing_branch_id, set())
+
+            for dependency in existing_registration["depends_on"]:
+                dependency_graph.setdefault(dependency, set())
+                dependency_graph[dependency].add(existing_branch_id)
+
+        dependency_graph.setdefault(branch_id, set())
+
+        for dependency in depends_on:
+
+            dependency_graph.setdefault(dependency, set())
+
+            # Is dependency already reachable from the new branch?
+            stack = [branch_id]
+            visited = set()
+
+            while stack:
+                current = stack.pop()
+
+                if current == dependency:
+                    raise ValueError(
+                        "Cyclic dependency introduced by branch %s "
+                        "depending on branch %s in PRAISE composition %s"
+                        % (branch_id, dependency, composition_id)
+                    )
+
+                if current in visited:
+                    continue
+
+                visited.add(current)
+                stack.extend(dependency_graph.get(current, ()))
+
         registration = {
             "type": Application.TYPE_MODULE,
             "dist": distribution,
@@ -578,5 +652,68 @@ class Application:
             "composition_push": (composition_id, branch_id)
         }
 
+        if module_name not in self.services:
+            self.services[module_name] = []
+
         self.services[module_name].append(registration)
         branches[branch_id] = registration
+
+
+    def set_composition_output_praise(
+        self,
+        *,
+        composition_id,
+        message_out):
+
+        """
+        Define the output emitted when a PRAISE composition completes.
+
+        Args:
+            composition_id: identifier of the composition
+
+            message_out (Message): output message emitted after the join
+        """
+
+        if composition_id not in self.compositions:
+            raise ValueError(
+                "Unknown PRAISE composition %s"
+                % composition_id
+            )
+
+        # Get the composition first.
+        composition = self.compositions[composition_id]
+
+        if "message_out" in composition:
+            raise ValueError(
+                "Output already defined for PRAISE composition %s"
+                % composition_id
+            )
+
+        # ILDE-PRAISE:
+        # Setting the composition output closes the static declaration.
+        # Forward dependency references were allowed while branches were being
+        # added; all of them must now resolve to declared sibling branches.
+
+        branches = composition["branches"]
+        branch_ids = set(branches.keys())
+
+        referenced_dependencies = set()
+
+        for registration in branches.values():
+            referenced_dependencies.update(
+                registration["depends_on"]
+            )
+
+        unknown_dependencies = referenced_dependencies - branch_ids
+
+        if unknown_dependencies:
+            raise ValueError(
+                "PRAISE composition %s has dependencies on undeclared branches %s"
+                % (
+                    composition_id,
+                    sorted(unknown_dependencies)
+                )
+            )
+
+        # Presence of message_out closes the composition declaration.
+        composition["message_out"] = message_out

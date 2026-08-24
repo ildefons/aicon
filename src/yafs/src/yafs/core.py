@@ -891,6 +891,16 @@ class Sim:
             composition["branches"].keys()
         )
 
+        # ILDE-PRAISE:
+        # Root branches have no activation dependencies and are launched
+        # immediately by the composition origin.
+        root_branches = frozenset(
+            branch_id
+            for branch_id, registration
+            in composition["branches"].items()
+            if not registration["depends_on"]
+        )
+
         controller = self.composition_controllers[
             (app_name, composition_id)
         ]
@@ -935,11 +945,18 @@ class Sim:
             )
 
             if key not in pending:
-                pending[key] = {}
+                pending[key] = {
+                    "activated": set(root_branches),
+                    "completed": {}
+                }
+
+            state = pending[key]
+            activated = state["activated"]
+            completed = state["completed"]
 
             # Our current grammar contains no retries or duplicated branch
             # completions, so receiving the same branch twice is an error.
-            if branch_id in pending[key]:
+            if branch_id in completed:
                 raise ValueError(
                     "Duplicate PRAISE branch completion: "
                     "composition=%s request=%s branch=%s parent_path=%s"
@@ -952,13 +969,106 @@ class Sim:
                 )
 
             # Keep the actual completion message, not merely the branch ID.
-            pending[key][branch_id] = msg
+            completed[branch_id] = msg
+
+            # ILDE-PRAISE:
+            # A dependent branch becomes eligible once all of its completion-based
+            # prerequisites have completed for this same composition invocation.
+            #
+            # depends_on is NOT success/failure-conditioned control.
+            # Choice, fallback and retry semantics are intentionally deferred.
+
+            for candidate_id, registration in composition["branches"].items():
+
+                if candidate_id in activated:
+                    continue
+
+                dependencies = set(registration["depends_on"])
+
+                if not dependencies.issubset(completed.keys()):
+                    continue
+
+                # Mark before sending so another completion event cannot activate
+                # the same branch twice.
+                activated.add(candidate_id)
+
+                # ILDE-PRAISE:
+                # Preserve the selectivity hook for future conditional operators.
+                # Current Step-0 compositions use mandatory branches
+                # (fractional_selectivity with threshold=1.0).
+                #
+                # Failure-conditioned fallback semantics are intentionally deferred.
+                if not registration["dist"](**registration["param"]):
+                    continue
+
+                branch_message = registration["message_out"].instantiate()
+
+                branch_message.id = msg.id
+                branch_message.timestamp = self.env.now
+
+                # Activate this sibling branch under the same parent composition
+                # context, then push its own branch frame.
+                branch_message.composition_path = (
+                    parent_path
+                    + (registration["composition_push"],)
+                )
+
+                branch_message.original_DES_src = msg.original_DES_src
+
+                # This activation originates at the composition controller.
+                # Do not inherit one prerequisite branch's linear DES history.
+                branch_message.last_idDes = [ides]
+
+                self.__send_message(
+                    app_name,
+                    branch_message,
+                    ides,
+                    self.FORWARD_METRIC
+                )
 
             received_branches = set(
-                pending[key].keys()
+                completed.keys()
             )
 
             if received_branches == expected_branches:
+                # ILDE-PRAISE:
+                # The complete composition now exposes exactly one output
+                # to its parent/downstream consumer.
+                if "message_out" not in composition:
+                    raise ValueError(
+                        "No output defined for PRAISE composition %s"
+                        % composition_id
+                    )
+
+                message_out = composition["message_out"]
+
+                if message_out is not None:
+
+                    joined = message_out.instantiate()
+
+                    # Preserve the logical root request.
+                    joined.id = msg.id
+
+                    # The composition has completed now.
+                    joined.timestamp = self.env.now
+
+                    # Pop exactly the innermost composition frame.
+                    joined.composition_path = parent_path
+
+                    # Preserve original source identity.
+                    joined.original_DES_src = msg.original_DES_src
+
+                    # A join has multiple incoming histories, so do not pretend
+                    # that one branch's linear last_idDes history represents all
+                    # of them. Start the post-join lineage at the controller.
+                    joined.last_idDes = [ides]
+
+                    self.__send_message(
+                        app_name,
+                        joined,
+                        ides,
+                        self.FORWARD_METRIC
+                    )
 
                 # This invocation of the composition is finished.
                 # Do not retain stale state.
@@ -1495,6 +1605,21 @@ class Sim:
                 all of them are add a list to be managed in only one DES process
                 MODULE TYPE CONSUMER : adding process:  __add_consumer_module
                 """
+
+                # ILDE-PRAISE:
+                # Only root branches of a composition are emitted immediately by the
+                # origin module. Branches with dependencies remain in the static
+                # composition specification and will later be activated by the
+                # composition controller when their prerequisites complete.
+                #
+                # depends_on is completion-based only. Choice/fallback/retry and
+                # failure-conditioned activation are intentionally deferred.
+                if (
+                        "composition_id" in service
+                        and service.get("depends_on")
+                ):
+                    continue
+
                 # 1 module puede consumir N type de messages con diferentes funciones de distribucion
                 register_consumer_msg.append(
                     {"message_in": service["message_in"], "message_out": service["message_out"],
