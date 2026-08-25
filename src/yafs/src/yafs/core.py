@@ -1015,7 +1015,8 @@ class Sim:
 
                 branch_message.original_DES_src = msg.original_DES_src
 
-                # This activation originates at the composition controller.
+                # Runtime release is performed by the composition controller.
+                # The branch Message.src remains the logical composition origin.
                 # Do not inherit one prerequisite branch's linear DES history.
                 branch_message.last_idDes = [ides]
 

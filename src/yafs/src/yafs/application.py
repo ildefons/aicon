@@ -576,6 +576,24 @@ class Application:
                     % composition_id
                 )
 
+        composition = self.compositions[composition_id]
+        # ILDE-PRAISE:
+        # A branch message describes the logical application graph.
+        # All sibling branches originate at the composition origin.
+        # depends_on changes activation time only; the internal controller
+        # that performs a delayed runtime release does not become Message.src.
+        if message_out != "" and message_out.src != composition["origin_module"]:
+            raise ValueError(
+                "PRAISE branch %s in composition %s must have logical source %s, "
+                "got %s"
+                % (
+                    branch_id,
+                    composition_id,
+                    composition["origin_module"],
+                    message_out.src,
+                )
+            )
+
         branches = self.compositions[composition_id]["branches"]
 
         if branch_id in branches:
@@ -682,6 +700,20 @@ class Application:
 
         # Get the composition first.
         composition = self.compositions[composition_id]
+
+        # ILDE-PRAISE:
+        # The single composition output is logically emitted by the
+        # composition controller after all branches have completed.
+        if message_out.src != composition["controller_name"]:
+            raise ValueError(
+                "PRAISE composition %s output must have logical source %s, "
+                "got %s"
+                % (
+                    composition_id,
+                    composition["controller_name"],
+                    message_out.src,
+                )
+            )
 
         if "message_out" in composition:
             raise ValueError(
