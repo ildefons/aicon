@@ -484,7 +484,20 @@ class Sim:
                 att_node = self.topology.G.nodes[id_node]
 
                 #ILDE
-                agent_node_ids = [agent_json["node_id"] for agent_json in self.management_network['management_network']['management_network'].agent_configs_json]
+                #PRAISE#agent_node_ids = [agent_json["node_id"] for agent_json in self.management_network['management_network']['management_network'].agent_configs_json]
+                agent_node_ids = []
+
+                for management_entry in self.management_network.values():
+                    if app not in management_entry.get("apps", []):
+                        continue
+
+                    management_network = management_entry["management_network"]
+
+                    agent_node_ids.extend(
+                        agent_json["node_id"]
+                        for agent_json in management_network.agent_configs_json
+                    )
+                #
                 available_ipt = float(att_node["IPT"])
                 position = -1
                 try:
