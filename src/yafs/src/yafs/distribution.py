@@ -85,12 +85,18 @@ class exponentialDistributionStartPoint(Distribution):
             return int(np.random.exponential(self.lambd, size=1)[0])
 
 class uniformDistribution(Distribution):
-    def __init__(self, min,max, **kwargs):
+    def __init__(self, min, max, seed=1, **kwargs):
+        if min > max:
+            raise ValueError("min must be <= max")
+
         self.min = min
         self.max = max
+        self.rnd = np.random.RandomState(seed)
+
         super(uniformDistribution, self).__init__(**kwargs)
+
     def next(self):
-        return random.randint(self.min, self.max)
+        return self.rnd.randint(self.min, self.max + 1)
 
 # ILDEBEGINE PRAISE
 class gamma_distribution(Distribution):

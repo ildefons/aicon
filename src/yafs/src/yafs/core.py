@@ -449,7 +449,7 @@ class Sim:
                 pct_instructions_tobeused = aux
                 metric_qos = message.qos(pct_instructions_tobeused) # ILDE message.inst
             
-            message_instructions_after_qos_adjustment = int(message.inst * metric_qos)
+            message_instructions_after_qos_adjustment = int(message.inst * pct_instructions_tobeused)
 
             if module in self.apps[app].get_sink_modules():
                 """
